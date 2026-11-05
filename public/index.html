@@ -316,13 +316,42 @@
           <label class="form-label">Academic Purpose / Subject</label>
           <textarea id="modalBookingPurpose" class="form-input" rows="3" placeholder="e.g. CpE Elec 3 Laboratory Activity" required></textarea>
         </div>
+               <p id="bookingError" class="modal-form-error hidden" role="alert"></p>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" onclick="closeModal('bookingModal')">Cancel</button>
-          <button type="submit" class="btn-primary">Submit Reservation Request</button>
+          <button type="submit" id="btnSubmitReservation" class="btn-primary">Submit Reservation Request</button>
         </div>
       </form>
     </div>
   </div>
+
+  <!-- RESERVATION SUCCESS MODAL -->
+  <div id="reservationSuccessModal" class="modal-backdrop hidden">
+    <section class="modal-dialog reservation-success-dialog" role="dialog" aria-modal="true" aria-labelledby="reservationSuccessTitle">
+      <div class="reservation-success-icon" aria-hidden="true">✓</div>
+      <h3 id="reservationSuccessTitle">Request submitted successfully</h3>
+      <p class="reservation-success-message">Your reservation is now pending faculty approval.</p>
+      <dl class="reservation-confirmation">
+        <div>
+          <dt>Request ID</dt>
+          <dd id="successReservationId"></dd>
+        </div>
+        <div>
+          <dt>Equipment</dt>
+          <dd id="successEquipmentName"></dd>
+        </div>
+        <div>
+          <dt>Date and time</dt>
+          <dd><span id="successReservationDate"></span> · <span id="successReservationTime"></span></dd>
+        </div>
+      </dl>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="closeModal('reservationSuccessModal')">Close</button>
+        <button type="button" class="btn-primary" onclick="viewMyReservations()">View My Reservations</button>
+      </div>
+    </section>
+  </div>
+
 
   <!-- REMARKS MODAL (Staff Approval / Rejection) -->
   <div id="remarksModal" class="modal-backdrop hidden">
