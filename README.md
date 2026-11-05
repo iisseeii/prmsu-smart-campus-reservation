@@ -1,68 +1,69 @@
 # PRMSU Smart Campus Reservation System
 
-A website for students to reserve campus equipment and for faculty/admins to manage inventory and reservation decisions. It uses HTML, CSS, JavaScript, Node.js, Express, and Supabase.
+A campus website for students to reserve equipment and for faculty or administrators to manage equipment and reservation decisions. The application uses Node.js, Express, HTML, CSS, JavaScript, and Supabase.
 
-## Project files
+## Folders and files
 
 ```text
-prmsu-smart-campus-reservation/
-├── database/
-│   ├── schema.sql                    # Creates database tables, policies, and starter equipment
-│   ├── reservation-workflow.sql      # Saves faculty decisions and updates approved stock
-│   └── provision-admin.sql           # Promotes an existing Supabase account to administrator
-├── public/
-│   ├── index.html                    # Website page structure
-│   ├── style.css                     # Website styles and layout
-│   └── app.js                        # Browser behavior and API requests
-├── .env.example                      # Template for required environment variables
-├── server.js                         # Express server and API
-├── package.json                      # Dependencies and run commands
-└── README.md                         # This guide
+prmsu-smart-campus-equipment-reservation/
+├── prmsu-smart-campus-reservation/    # The actual website application
+│   ├── database/
+│   │   ├── schema.sql                 # Creates the Supabase tables and starter equipment
+│   │   └── provision-admin.sql        # Promotes an existing account to administrator
+│   ├── public/
+│   │   ├── index.html                 # Website page structure
+│   │   ├── style.css                  # Website appearance
+│   │   └── app.js                     # Browser interactions
+│   ├── server.js                      # Express server and API
+│   ├── package.json                   # Dependencies and commands
+│   └── .env.example                   # Environment-variable template
+├── .gitignore                         # Files Git should not upload
+└── README.md                          # This guide
 ```
 
 ## Run locally
 
 You need Node.js and a Supabase project.
 
-1. Open a terminal in this project folder and install dependencies:
+1. Open PowerShell in the website folder:
 
-   ```bash
+   ```powershell
+   cd "C:\Users\rglds\Downloads\prmsu-smart-campus-equipment-reservation\prmsu-smart-campus-reservation"
+   ```
+
+2. Install the dependencies:
+
+   ```powershell
    npm install
    ```
 
-2. In your Supabase project, open **SQL Editor** and run `database/schema.sql`, then `database/reservation-workflow.sql`.
+3. In the Supabase Dashboard, open **SQL Editor** and run `database/schema.sql`, followed by `database/reservation-workflow.sql`.
 
-3. Copy `.env.example` to `.env` and fill in `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from **Supabase → Project Settings → API**. Keep the service-role key private.
-
-   PowerShell:
+4. Copy `.env.example` to `.env` if you do not already have `.env`, then fill in `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from **Project Settings → API**.
 
    ```powershell
    Copy-Item .env.example .env
    ```
 
-4. Start the website:
+   Keep the service-role key private. Do not put keys in `public/` or upload `.env`.
 
-   ```bash
+5. Start the website and open it in your browser:
+
+   ```powershell
    npm start
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000).
+   Go to [http://localhost:3000](http://localhost:3000). Stop the server with `Ctrl+C`.
 
-To stop the server, press `Ctrl+C` in the terminal. If port 3000 is already in use, set `PORT=3001` in `.env`, restart, and open `http://localhost:3001`.
+## Deploy with Vercel
 
-## Deploy online with Render
-
-1. Push this project to a GitHub repository. Do not include `.env` or any secret keys.
-2. In [Render](https://render.com), choose **New → Web Service** and connect the repository.
-3. Set the **Root Directory** to `prmsu-smart-campus-reservation` if this project is inside a parent repository; otherwise leave it blank.
-4. Use these settings:
-   - **Build Command:** `npm install`
-   - **Start Command:** `npm start`
-5. In Render's **Environment** settings, add:
+1. Push the project to GitHub. Ensure `.env` and all secret keys are excluded.
+2. In Vercel, select **Add New → Project** and import the GitHub repository.
+3. Set **Root Directory** to `prmsu-smart-campus-reservation` (the folder containing `package.json` and `server.js`).
+4. In **Project Settings → Environment Variables**, add:
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
-6. Deploy the service and open the URL Render provides.
-7. In Supabase **Authentication → URL Configuration**, set the production Site URL to the Render URL and add it to the allowed redirect URLs.
+5. Deploy the project. Set the Vercel production URL in Supabase under **Authentication → URL Configuration** as the Site URL and an allowed redirect URL.
 
-The Supabase database scripts need to be run only once per project, before using the deployed website. Keep all Supabase keys private; never add them to `public/` files or commit `.env`.
+Run the two Supabase SQL scripts before using the deployed website. Keep all secret keys private.
