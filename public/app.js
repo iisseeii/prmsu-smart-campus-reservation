@@ -476,6 +476,7 @@ function openBookingModal(eqId) {
   document.getElementById('modalEqId').value = item.id;
   document.getElementById('modalEqName').innerText = `Reserve ${item.name}`;
   document.getElementById('modalEqCategory').value = item.category;
+  document.getElementById('bookingError').classList.add('hidden');
   document.getElementById('bookingModal').classList.remove('hidden');
 }
 
@@ -486,34 +487,58 @@ async function handleBookingSubmit(e) {
   const reservationDate = document.getElementById('modalBookingDate').value;
   const timeSlot = document.getElementById('modalBookingSlot').value;
   const purpose = document.getElementById('modalBookingPurpose').value;
-
-  const eq = equipmentList.find(e => e.id === eqId);
-
-  const newRes = {
-    id: `RES-${Math.floor(1000 + Math.random() * 9000)}`,
-    userId: currentUser.id,
-    userName: currentUser.name,
-    equipmentId: eqId,
-    equipmentName: eq.name,
-    qty: parseInt(qty),
-    reservationDate,
-    timeSlot,
-    purpose,
-    status: 'Pending',
-    remarks: 'Awaiting faculty approval'
-  };
-
+  const errorNotice = document.getElementById('bookingError');
+  const button = document.getElementById('btnSubmitReservation');
+  button.disabled = true;
+  errorNotice.classList.add('hidden');
   try {
-    await fetch('/api/reservations', {
+    const response = await fetch('/api/reservations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newRes)
+      body: JSON.stringify({
+        userId: currentUser.id,
+        userName: currentUser.name,
+        equipmentId: eqId,
+        qty: Number.parseInt(qty, 10),
+        reservationDate,
+        timeSlot,
+        purpose
+      })
     });
-  } catch (err) { console.warn(err); }
 
-  reservationsList.push(newRes);
-  closeModal('bookingModal');
-  alert('Reservation request submitted successfully!');
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      throw new Error('The server returned an unreadable response. Please try again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to submit your reservation request.');
+    }
+    if (!data.reservation) {
+      throw new Error('The server did not confirm your reservation. Please try again.');
+    }
+
+    const reservation = data.reservation;
+    reservationsList.push(reservation);
+    document.getElementById('successReservationId').textContent = reservation.id;
+    document.getElementById('successEquipmentName').textContent = reservation.equipmentName;
+    document.getElementById('successReservationDate').textContent = reservation.reservationDate;
+    document.getElementById('successReservationTime').textContent = reservation.timeSlot;
+    closeModal('bookingModal');
+    document.getElementById('reservationSuccessModal').classList.remove('hidden');
+    document.querySelector('#reservationSuccessModal button').focus();
+  } catch (err) {
+    errorNotice.textContent = err.message || 'Unable to submit your reservation request. Please try again.';
+    errorNotice.classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function viewMyReservations() {
+  closeModal('reservationSuccessModal');
   switchDashboardTab('my-reservations');
 }
 
