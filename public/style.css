@@ -355,6 +355,33 @@ body {
   gap: 1rem;
 }
 
+.reservation-status-notice {
+  margin: -0.5rem 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: white;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.reservation-status-notice.has-decisions {
+  border-color: #BBF7D0;
+  background: #F0FDF4;
+  color: #166534;
+}
+
+.reservation-status-notice.has-error {
+  border-color: #FECACA;
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.reservation-status-notice + .table-container {
+  margin-top: 0;
+}
+
 .filter-controls {
   display: flex;
   gap: 0.75rem;
