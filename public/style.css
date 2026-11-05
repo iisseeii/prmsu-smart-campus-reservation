@@ -221,33 +221,6 @@ body {
   line-height: 1.5;
 }
 
-.auth-link {
-  display: block;
-  margin: 0.9rem 0 0 auto;
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--orange-primary);
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.auth-link:hover {
-  text-decoration: underline;
-}
-
-.auth-panel-title {
-  margin-bottom: 0.5rem;
-  font-size: 1.25rem;
-}
-
-.auth-panel-description {
-  margin-bottom: 1.25rem;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
 .auth-notice.error {
   color: var(--status-rejected);
 }
