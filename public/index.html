@@ -52,6 +52,7 @@
             <input type="password" id="authPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password" required>
           </div>
           <button type="submit" id="btnSignIn" class="btn-primary full-width">Sign In to Portal <span aria-hidden="true">&rarr;</span></button>
+          <button type="submit" id="btnSignIn" class="btn-primary full-width">Sign In to Portal <span aria-hidden="true">&rarr;</span></button>
         </form>
 
         <form id="signupPanel" class="hidden" role="tabpanel" aria-labelledby="tabSignup" onsubmit="handleStudentSignUp(event)">
@@ -151,7 +152,9 @@
             <h2>My Reservation Requests</h2>
             <p>Track current approvals and cancel pending requests.</p>
           </div>
+          <button type="button" id="btnRefreshReservations" class="btn-secondary" onclick="refreshMyReservations()">Refresh Status</button>
         </div>
+        <p id="reservationStatusNotice" class="reservation-status-notice" role="status" aria-live="polite">Reservation decisions from faculty will appear here.</p>
         <div class="table-container">
           <table class="data-table">
             <thead>
