@@ -111,8 +111,8 @@
             <path d="M4.5 3h15M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3M6 14h12M9 3v4m6-4v4"></path>
           </svg>
           <div>
-            <span class="header-brand-title">PRMSU COE-CPE</span>
-            <span class="header-brand-sub">CpE Tool Reservation</span>
+            <span class="header-brand-title">PRMSU COE</span>
+            <span class="header-brand-sub">Smart Campus Reservation</span>
           </div>
         </div>
       </div>
@@ -316,7 +316,7 @@
           <label class="form-label">Academic Purpose / Subject</label>
           <textarea id="modalBookingPurpose" class="form-input" rows="3" placeholder="e.g. CpE Elec 3 Laboratory Activity" required></textarea>
         </div>
-               <p id="bookingError" class="modal-form-error hidden" role="alert"></p>
+        <p id="bookingError" class="modal-form-error hidden" role="alert"></p>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" onclick="closeModal('bookingModal')">Cancel</button>
           <button type="submit" id="btnSubmitReservation" class="btn-primary">Submit Reservation Request</button>
@@ -352,6 +352,30 @@
     </section>
   </div>
 
+  <!-- RESERVATION CANCELLATION MODAL -->
+  <div id="cancelReservationModal" class="modal-backdrop hidden">
+    <section class="modal-dialog reservation-success-dialog" role="dialog" aria-modal="true" aria-labelledby="cancelReservationTitle">
+      <div id="cancelReservationIcon" class="reservation-success-icon reservation-cancel-icon" aria-hidden="true">!</div>
+      <h3 id="cancelReservationTitle">Cancel this reservation?</h3>
+      <p id="cancelReservationMessage" class="reservation-success-message">Are you sure you want to cancel this pending request?</p>
+      <dl class="reservation-confirmation">
+        <div>
+          <dt>Request ID</dt>
+          <dd id="cancelReservationId"></dd>
+        </div>
+        <div>
+          <dt>Equipment</dt>
+          <dd id="cancelEquipmentName"></dd>
+        </div>
+      </dl>
+      <p id="cancelReservationError" class="modal-form-error hidden" role="alert"></p>
+      <div class="modal-actions">
+        <button type="button" id="btnKeepReservation" class="btn-secondary" onclick="closeModal('cancelReservationModal')">Keep Reservation</button>
+        <button type="button" id="btnConfirmCancellation" class="btn-danger" onclick="confirmReservationCancellation()">Yes, Cancel Request</button>
+        <button type="button" id="btnViewReservationsAfterCancel" class="btn-primary hidden" onclick="closeModal('cancelReservationModal')">Close</button>
+      </div>
+    </section>
+  </div>
 
   <!-- REMARKS MODAL (Staff Approval / Rejection) -->
   <div id="remarksModal" class="modal-backdrop hidden">
