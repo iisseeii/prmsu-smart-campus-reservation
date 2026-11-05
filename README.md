@@ -74,8 +74,9 @@ prmsu-smart-campus-reservation/
 
 ### Account access
 - Students can register with any valid email address. Supabase sends a confirmation email; they must confirm it before signing in. Student profiles are created by the database trigger in `database/schema.sql`. The schema is safe to rerun and does not drop existing equipment or reservation tables.
-- Sign in accepts a student/faculty ID or email and password. **Forgot password?** emails a Supabase recovery link; the allowed redirect URL must include the URL and port where the app is running.
-- To provision an administrator, invite/create their user in **Supabase Authentication -> Users**, then promote the linked profile in the SQL Editor. For example:
+- Sign in accepts a student/faculty ID or email and password. Password reset is not available in the app; administrators can manage account passwords in Supabase Authentication.
+- To provision the project administrator, first create the account in **Supabase Authentication -> Users**, then run `database/provision-admin.sql` in the SQL Editor. The script promotes the existing Auth user to `ADMIN`; it does not create or change the account password. Sign in with the password set for that Auth user.
+  To provision another administrator, update the email, ID number, and display name in the script before running it. For a manually linked profile, the equivalent update is:
   ```sql
   UPDATE public.users
   SET role = 'ADMIN', id_number = 'ADMIN-001', full_name = 'Campus Admin'
