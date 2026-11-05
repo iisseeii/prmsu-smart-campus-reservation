@@ -247,6 +247,7 @@ function switchDashboardTab(tabName) {
     document.getElementById('secMyReservations').classList.remove('hidden');
     document.getElementById('navMyReservations').classList.add('active');
     renderMyReservations();
+    refreshMyReservations();
   } else if (tabName === 'approvals') {
     document.getElementById('secApprovals').classList.remove('hidden');
     document.getElementById('navApprovals').classList.add('active');
@@ -302,6 +303,23 @@ function renderCatalog() {
 function renderMyReservations() {
   const tbody = document.getElementById('tblMyReservations');
   const myRes = reservationsList.filter(r => r.userId === currentUser.id);
+  const notice = document.getElementById('reservationStatusNotice');
+  const acceptedCount = myRes.filter(r => r.status === 'Approved').length;
+  const rejectedCount = myRes.filter(r => r.status === 'Rejected').length;
+  const pendingCount = myRes.filter(r => r.status === 'Pending').length;
+
+  if (acceptedCount || rejectedCount) {
+    const decisions = [];
+    if (acceptedCount) decisions.push(`${acceptedCount} accepted`);
+    if (rejectedCount) decisions.push(`${rejectedCount} rejected`);
+    notice.textContent = `Faculty decision${acceptedCount + rejectedCount === 1 ? '' : 's'}: ${decisions.join(', ')}. See the status and faculty remarks below.`;
+    notice.className = 'reservation-status-notice has-decisions';
+  } else {
+    notice.textContent = pendingCount
+      ? `${pendingCount} reservation${pendingCount === 1 ? ' is' : 's are'} waiting for faculty approval.`
+      : 'Reservation decisions from faculty will appear here.';
+    notice.className = 'reservation-status-notice';
+  }
 
   if (myRes.length === 0) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-muted);">No reservation requests submitted yet.</td></tr>`;
@@ -315,13 +333,39 @@ function renderMyReservations() {
       <td>${r.qty}</td>
       <td>${r.reservationDate}</td>
       <td>${r.timeSlot}</td>
-      <td><span class="status-badge ${r.status.toLowerCase()}">${r.status}</span></td>
+      <td><span class="status-badge ${r.status.toLowerCase()}">${r.status === 'Approved' ? 'Accepted' : r.status}</span></td>
       <td>${r.remarks || '-'}</td>
       <td>
         ${r.status === 'Pending' ? `<button class="btn-danger btn-sm" onclick="cancelReservation('${r.id}')">Cancel</button>` : '-'}
       </td>
     </tr>
   `).join('');
+}
+
+async function refreshMyReservations() {
+  const button = document.getElementById('btnRefreshReservations');
+  const notice = document.getElementById('reservationStatusNotice');
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/reservations?userId=${encodeURIComponent(currentUser.id)}`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to refresh reservation status.');
+    }
+    if (!Array.isArray(data)) {
+      throw new Error('The server returned an invalid reservation list.');
+    }
+
+    reservationsList = reservationsList
+      .filter(reservation => reservation.userId !== currentUser.id)
+      .concat(data);
+    renderMyReservations();
+  } catch (err) {
+    notice.textContent = err.message || 'Unable to refresh reservation status. Please try again.';
+    notice.className = 'reservation-status-notice has-error';
+  } finally {
+    button.disabled = false;
+  }
 }
 
 // --- STAFF APPROVALS RENDER ---
