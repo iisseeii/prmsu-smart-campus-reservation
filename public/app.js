@@ -17,11 +17,8 @@ async function fetchInitialData() {
   try {
     const eqRes = await fetch('/api/equipment');
     if (eqRes.ok) equipmentList = await eqRes.json();
-
-    const resRes = await fetch('/api/reservations');
-    if (resRes.ok) reservationsList = await resRes.json();
   } catch (err) {
-    console.warn('Backend server not connected. Running in client-side preview mode.');
+    console.error('Unable to load equipment from the server:', err);
   }
 }
 
@@ -42,11 +39,6 @@ async function initializeSupabaseAuth() {
     const authError = hashParams.get('error_description') || queryParams.get('error_description');
     if (authError) {
       setAuthNotice(authError.replace(/\+/g, ' '), 'error');
-      return;
-    }
-
-    if (queryParams.get('flow') === 'reset' || hashParams.get('type') === 'recovery') {
-      showPasswordUpdate();
       return;
     }
 
@@ -81,41 +73,25 @@ function switchAuthTab(type) {
   tabSignup.setAttribute('aria-selected', String(!isSignin));
   signinPanel.classList.toggle('hidden', !isSignin);
   signupPanel.classList.toggle('hidden', isSignin);
-  document.getElementById('passwordResetRequestPanel').classList.add('hidden');
-  document.getElementById('passwordUpdatePanel').classList.add('hidden');
   setAuthNotice(isSignin
     ? 'Faculty and staff accounts are provided by the administrator. Use the ID and password issued to you.'
     : 'Student accounts only. Faculty and staff should contact the administrator for their account.', '');
-}
-
-function showPasswordReset() {
-  document.getElementById('authTabs').classList.add('hidden');
-  document.getElementById('signinPanel').classList.add('hidden');
-  document.getElementById('signupPanel').classList.add('hidden');
-  document.getElementById('passwordUpdatePanel').classList.add('hidden');
-  document.getElementById('passwordResetRequestPanel').classList.remove('hidden');
-  const identifier = document.getElementById('authIdentifier').value.trim();
-  document.getElementById('resetEmail').value = identifier.includes('@') ? identifier : '';
-  setAuthNotice('', '');
-}
-
-function showPasswordUpdate() {
-  document.getElementById('authTabs').classList.add('hidden');
-  document.getElementById('signinPanel').classList.add('hidden');
-  document.getElementById('signupPanel').classList.add('hidden');
-  document.getElementById('passwordResetRequestPanel').classList.add('hidden');
-  document.getElementById('passwordUpdatePanel').classList.remove('hidden');
-  setAuthNotice('Enter a new password for your account.', '');
-}
-
-function returnToSignIn() {
-  switchAuthTab('signin');
 }
 
 function setAuthNotice(message, type) {
   const notice = document.getElementById('authNotice');
   notice.textContent = message;
   notice.className = `auth-notice${type ? ` ${type}` : ''}`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[character]);
 }
 
 async function postAuthRequest(path, payload, accessToken) {
@@ -149,6 +125,22 @@ async function postAuthRequest(path, payload, accessToken) {
   }
 
   return data;
+}
+
+async function apiFetch(path, options = {}) {
+  if (!supabaseClient) {
+    throw new Error('Supabase is not ready. Please reload the page and sign in again.');
+  }
+
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) throw error;
+
+  const headers = new Headers(options.headers || {});
+  if (data.session) {
+    headers.set('Authorization', `Bearer ${data.session.access_token}`);
+  }
+
+  return fetch(path, { ...options, headers });
 }
 
 async function handleSignIn(e) {
@@ -223,56 +215,6 @@ async function handleStudentSignUp(e) {
   }
 }
 
-async function handlePasswordResetRequest(e) {
-  e.preventDefault();
-  if (!supabaseClient) {
-    setAuthNotice('Supabase is not ready. Check its configuration and reload the page.', 'error');
-    return;
-  }
-
-  const email = document.getElementById('resetEmail').value.trim().toLowerCase();
-  const button = document.getElementById('btnRequestReset');
-  button.disabled = true;
-  setAuthNotice('Sending password reset email...', '');
-  try {
-    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/?flow=reset`
-    });
-    if (error) throw error;
-    setAuthNotice('If an account exists for this email, a password reset link has been sent. If you do not receive one, the email does not exists.', 'success');
-  } catch (err) {
-    setAuthNotice(err.message || 'Unable to send the reset email. Please try again.', 'error');
-  } finally {
-    button.disabled = false;
-  }
-}
-
-async function handlePasswordUpdate(e) {
-  e.preventDefault();
-  if (!supabaseClient) {
-    setAuthNotice('Supabase is not ready. Check its configuration and reload the page.', 'error');
-    return;
-  }
-
-  const button = document.getElementById('btnUpdatePassword');
-  const password = document.getElementById('newPassword').value;
-  button.disabled = true;
-  setAuthNotice('Updating your password...', '');
-  try {
-    const { error } = await supabaseClient.auth.updateUser({ password });
-    if (error) throw error;
-    await supabaseClient.auth.signOut();
-    document.getElementById('passwordUpdatePanel').reset();
-    window.history.replaceState({}, document.title, window.location.pathname);
-    switchAuthTab('signin');
-    setAuthNotice('Password updated. Sign in with your new password.', 'success');
-  } catch (err) {
-    setAuthNotice(err.message || 'Unable to update your password. Request a new reset link.', 'error');
-  } finally {
-    button.disabled = false;
-  }
-}
-
 function setupUserSession() {
   document.getElementById('authContainer').classList.add('hidden');
   document.getElementById('appContainer').classList.remove('hidden');
@@ -284,6 +226,8 @@ function setupUserSession() {
 
   const studentNav = document.getElementById('studentNav');
   const adminNav = document.getElementById('adminNav');
+  const usersNav = document.getElementById('navUsers');
+  usersNav.classList.toggle('hidden', currentUser.role !== 'ADMIN');
 
   if (currentUser.role === 'STUDENT') {
     studentNav.classList.remove('hidden');
@@ -312,8 +256,10 @@ async function logout() {
 
 // --- TAB SWITCHING LOGIC ---
 function switchDashboardTab(tabName) {
+  if (tabName === 'users' && currentUser?.role !== 'ADMIN') return;
+
   // Hide all sections
-  const sections = ['secCatalog', 'secMyReservations', 'secApprovals', 'secInventory', 'secAllLogs'];
+  const sections = ['secCatalog', 'secMyReservations', 'secApprovals', 'secInventory', 'secAllLogs', 'secUsers'];
   sections.forEach(s => document.getElementById(s).classList.add('hidden'));
 
   // Remove active styling from nav buttons
@@ -328,10 +274,12 @@ function switchDashboardTab(tabName) {
     document.getElementById('secMyReservations').classList.remove('hidden');
     document.getElementById('navMyReservations').classList.add('active');
     renderMyReservations();
+    refreshMyReservations();
   } else if (tabName === 'approvals') {
     document.getElementById('secApprovals').classList.remove('hidden');
     document.getElementById('navApprovals').classList.add('active');
     renderApprovals();
+    refreshApprovals();
   } else if (tabName === 'inventory') {
     document.getElementById('secInventory').classList.remove('hidden');
     document.getElementById('navInventory').classList.add('active');
@@ -340,6 +288,46 @@ function switchDashboardTab(tabName) {
     document.getElementById('secAllLogs').classList.remove('hidden');
     document.getElementById('navAllLogs').classList.add('active');
     renderMasterLog();
+  } else if (tabName === 'users') {
+    document.getElementById('secUsers').classList.remove('hidden');
+    document.getElementById('navUsers').classList.add('active');
+  }
+}
+
+async function handleUserAccountSubmit(event) {
+  event.preventDefault();
+  const form = document.getElementById('userAccountForm');
+  const button = document.getElementById('btnCreateUser');
+  const notice = document.getElementById('userAccountNotice');
+  const payload = {
+    name: document.getElementById('newUserName').value.trim(),
+    idNumber: document.getElementById('newUserId').value.trim(),
+    email: document.getElementById('newUserEmail').value.trim().toLowerCase(),
+    role: document.getElementById('newUserRole').value,
+    password: document.getElementById('newUserPassword').value
+  };
+
+  button.disabled = true;
+  notice.className = 'reservation-status-notice hidden';
+  try {
+    const response = await apiFetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to create the account.');
+    }
+
+    form.reset();
+    notice.className = 'reservation-status-notice has-decisions';
+    notice.textContent = `${data.user.role === 'INSTRUCTOR' ? 'Faculty' : 'Student'} account created for ${data.user.name} (${data.user.idNumber}). Share the initial password with them directly.`;
+  } catch (error) {
+    notice.className = 'reservation-status-notice has-error';
+    notice.textContent = error.message || 'Unable to create the account. Please try again.';
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -383,6 +371,23 @@ function renderCatalog() {
 function renderMyReservations() {
   const tbody = document.getElementById('tblMyReservations');
   const myRes = reservationsList.filter(r => r.userId === currentUser.id);
+  const notice = document.getElementById('reservationStatusNotice');
+  const acceptedCount = myRes.filter(r => r.status === 'Approved').length;
+  const rejectedCount = myRes.filter(r => r.status === 'Rejected').length;
+  const pendingCount = myRes.filter(r => r.status === 'Pending').length;
+
+  if (acceptedCount || rejectedCount) {
+    const decisions = [];
+    if (acceptedCount) decisions.push(`${acceptedCount} accepted`);
+    if (rejectedCount) decisions.push(`${rejectedCount} rejected`);
+    notice.textContent = `Faculty decision${acceptedCount + rejectedCount === 1 ? '' : 's'}: ${decisions.join(', ')}. See the status and faculty remarks below.`;
+    notice.className = 'reservation-status-notice has-decisions';
+  } else {
+    notice.textContent = pendingCount
+      ? `${pendingCount} reservation${pendingCount === 1 ? ' is' : 's are'} waiting for faculty approval.`
+      : 'Reservation decisions from faculty will appear here.';
+    notice.className = 'reservation-status-notice';
+  }
 
   if (myRes.length === 0) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-muted);">No reservation requests submitted yet.</td></tr>`;
@@ -391,18 +396,68 @@ function renderMyReservations() {
 
   tbody.innerHTML = myRes.map(r => `
     <tr>
-      <td><strong>${r.id}</strong></td>
-      <td>${r.equipmentName}</td>
+      <td><strong>${escapeHtml(r.id)}</strong></td>
+      <td>${escapeHtml(r.equipmentName)}</td>
       <td>${r.qty}</td>
-      <td>${r.reservationDate}</td>
-      <td>${r.timeSlot}</td>
-      <td><span class="status-badge ${r.status.toLowerCase()}">${r.status}</span></td>
-      <td>${r.remarks || '-'}</td>
+      <td>${escapeHtml(r.reservationDate)}</td>
+      <td>${escapeHtml(r.timeSlot)}</td>
+      <td><span class="status-badge ${escapeHtml(r.status.toLowerCase())}">${escapeHtml(r.status === 'Approved' ? 'Accepted' : r.status)}</span></td>
+      <td>${escapeHtml(r.remarks || '-')}</td>
       <td>
         ${r.status === 'Pending' ? `<button class="btn-danger btn-sm" onclick="cancelReservation('${r.id}')">Cancel</button>` : '-'}
       </td>
     </tr>
   `).join('');
+}
+
+async function refreshMyReservations() {
+  const button = document.getElementById('btnRefreshReservations');
+  const notice = document.getElementById('reservationStatusNotice');
+  button.disabled = true;
+  try {
+    const response = await apiFetch('/api/reservations');
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to refresh reservation status.');
+    }
+    if (!Array.isArray(data)) {
+      throw new Error('The server returned an invalid reservation list.');
+    }
+
+    reservationsList = reservationsList
+      .filter(reservation => reservation.userId !== currentUser.id)
+      .concat(data);
+    renderMyReservations();
+  } catch (err) {
+    notice.textContent = err.message || 'Unable to refresh reservation status. Please try again.';
+    notice.className = 'reservation-status-notice has-error';
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function refreshApprovals() {
+  const notice = document.getElementById('approvalNotice');
+  try {
+    const response = await apiFetch('/api/reservations');
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to load reservation requests.');
+    }
+    if (!Array.isArray(data)) {
+      throw new Error('The server returned an invalid reservation list.');
+    }
+
+    reservationsList = reservationsList
+      .filter(reservation => reservation.userId === currentUser.id)
+      .concat(data);
+    notice.classList.add('hidden');
+    renderApprovals();
+    renderMasterLog();
+  } catch (err) {
+    notice.textContent = err.message || 'Unable to load reservation requests.';
+    notice.className = 'reservation-status-notice has-error';
+  }
 }
 
 // --- STAFF APPROVALS RENDER ---
@@ -417,12 +472,12 @@ function renderApprovals() {
 
   tbody.innerHTML = pending.map(r => `
     <tr>
-      <td><strong>${r.id}</strong></td>
-      <td>${r.userName}</td>
-      <td>${r.equipmentName}</td>
+      <td><strong>${escapeHtml(r.id)}</strong></td>
+      <td>${escapeHtml(r.userName)}</td>
+      <td>${escapeHtml(r.equipmentName)}</td>
       <td>${r.qty}</td>
-      <td>${r.reservationDate}<br><small>${r.timeSlot}</small></td>
-      <td>${r.purpose}</td>
+      <td>${escapeHtml(r.reservationDate)}<br><small>${escapeHtml(r.timeSlot)}</small></td>
+      <td>${escapeHtml(r.purpose)}</td>
       <td>
         <button class="btn-success btn-sm" onclick="openRemarksModal('${r.id}', 'Approved')">Approve</button>
         <button class="btn-danger btn-sm" onclick="openRemarksModal('${r.id}', 'Rejected')">Reject</button>
@@ -457,13 +512,13 @@ function renderMasterLog() {
   const tbody = document.getElementById('tblMasterLog');
   tbody.innerHTML = reservationsList.map(r => `
     <tr>
-      <td><strong>${r.id}</strong></td>
-      <td>${r.userName}</td>
-      <td>${r.equipmentName}</td>
+      <td><strong>${escapeHtml(r.id)}</strong></td>
+      <td>${escapeHtml(r.userName)}</td>
+      <td>${escapeHtml(r.equipmentName)}</td>
       <td>${r.qty}</td>
-      <td>${r.reservationDate}</td>
-      <td><span class="status-badge ${r.status.toLowerCase()}">${r.status}</span></td>
-      <td>${r.remarks || '-'}</td>
+      <td>${escapeHtml(r.reservationDate)}</td>
+      <td><span class="status-badge ${escapeHtml(r.status.toLowerCase())}">${escapeHtml(r.status)}</span></td>
+      <td>${escapeHtml(r.remarks || '-')}</td>
     </tr>
   `).join('');
 }
@@ -476,6 +531,7 @@ function openBookingModal(eqId) {
   document.getElementById('modalEqId').value = item.id;
   document.getElementById('modalEqName').innerText = `Reserve ${item.name}`;
   document.getElementById('modalEqCategory').value = item.category;
+  document.getElementById('bookingError').classList.add('hidden');
   document.getElementById('bookingModal').classList.remove('hidden');
 }
 
@@ -486,34 +542,58 @@ async function handleBookingSubmit(e) {
   const reservationDate = document.getElementById('modalBookingDate').value;
   const timeSlot = document.getElementById('modalBookingSlot').value;
   const purpose = document.getElementById('modalBookingPurpose').value;
-
-  const eq = equipmentList.find(e => e.id === eqId);
-
-  const newRes = {
-    id: `RES-${Math.floor(1000 + Math.random() * 9000)}`,
-    userId: currentUser.id,
-    userName: currentUser.name,
-    equipmentId: eqId,
-    equipmentName: eq.name,
-    qty: parseInt(qty),
-    reservationDate,
-    timeSlot,
-    purpose,
-    status: 'Pending',
-    remarks: 'Awaiting faculty approval'
-  };
-
+  const errorNotice = document.getElementById('bookingError');
+  const button = document.getElementById('btnSubmitReservation');
+  button.disabled = true;
+  errorNotice.classList.add('hidden');
   try {
-    await fetch('/api/reservations', {
+    const response = await apiFetch('/api/reservations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newRes)
+      body: JSON.stringify({
+        userId: currentUser.id,
+        userName: currentUser.name,
+        equipmentId: eqId,
+        qty: Number.parseInt(qty, 10),
+        reservationDate,
+        timeSlot,
+        purpose
+      })
     });
-  } catch (err) { console.warn(err); }
 
-  reservationsList.push(newRes);
-  closeModal('bookingModal');
-  alert('Reservation request submitted successfully!');
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      throw new Error('The server returned an unreadable response. Please try again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to submit your reservation request.');
+    }
+    if (!data.reservation) {
+      throw new Error('The server did not confirm your reservation. Please try again.');
+    }
+
+    const reservation = data.reservation;
+    reservationsList.push(reservation);
+    document.getElementById('successReservationId').textContent = reservation.id;
+    document.getElementById('successEquipmentName').textContent = reservation.equipmentName;
+    document.getElementById('successReservationDate').textContent = reservation.reservationDate;
+    document.getElementById('successReservationTime').textContent = reservation.timeSlot;
+    closeModal('bookingModal');
+    document.getElementById('reservationSuccessModal').classList.remove('hidden');
+    document.querySelector('#reservationSuccessModal button').focus();
+  } catch (err) {
+    errorNotice.textContent = err.message || 'Unable to submit your reservation request. Please try again.';
+    errorNotice.classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function viewMyReservations() {
+  closeModal('reservationSuccessModal');
   switchDashboardTab('my-reservations');
 }
 
@@ -522,6 +602,7 @@ function openRemarksModal(resId, action) {
   document.getElementById('remarksActionType').value = action;
   document.getElementById('remarksModalTitle').innerText = `${action} Reservation`;
   document.getElementById('btnSubmitRemarks').className = action === 'Approved' ? 'btn-primary' : 'btn-danger';
+  document.getElementById('remarksError').classList.add('hidden');
   document.getElementById('remarksModal').classList.remove('hidden');
 }
 
@@ -529,41 +610,102 @@ async function handleRemarksSubmit(e) {
   e.preventDefault();
   const resId = document.getElementById('remarksResId').value;
   const action = document.getElementById('remarksActionType').value;
-  const remarks = document.getElementById('modalRemarksText').value;
-
-  const resItem = reservationsList.find(r => r.id === resId);
-  if (resItem) {
-    resItem.status = action;
-    resItem.remarks = remarks;
-
-    if (action === 'Approved') {
-      const eq = equipmentList.find(e => e.id === resItem.equipmentId);
-      if (eq) eq.availableQty -= resItem.qty;
-    }
-  }
-
+  const remarks = document.getElementById('modalRemarksText').value.trim();
+  const button = document.getElementById('btnSubmitRemarks');
+  const errorNotice = document.getElementById('remarksError');
+  button.disabled = true;
+  errorNotice.classList.add('hidden');
   try {
-    await fetch(`/api/reservations/${resId}`, {
+    const response = await apiFetch(`/api/reservations/${encodeURIComponent(resId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: action, remarks })
     });
-  } catch (err) { console.warn(err); }
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to save the reservation decision.');
+    }
 
-  closeModal('remarksModal');
-  renderApprovals();
+    reservationsList = reservationsList.map(reservation =>
+      reservation.id === resId ? data.reservation : reservation
+    );
+    if (action === 'Approved') {
+      try {
+        const equipmentResponse = await fetch('/api/equipment');
+        if (equipmentResponse.ok) equipmentList = await equipmentResponse.json();
+      } catch (err) {
+        console.error('Unable to refresh equipment availability:', err);
+      }
+    }
+
+    closeModal('remarksModal');
+    renderApprovals();
+    const notice = document.getElementById('approvalNotice');
+    notice.className = 'reservation-status-notice has-decisions';
+    notice.textContent = `Reservation ${action === 'Approved' ? 'accepted' : 'rejected'}. The student can see the decision and your remarks in My Reservations.`;
+  } catch (err) {
+    errorNotice.textContent = err.message || 'Unable to save the reservation decision. Please try again.';
+    errorNotice.classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+  }
 }
 
-async function cancelReservation(resId) {
-  if (!confirm('Are you sure you want to cancel this pending reservation?')) return;
+function cancelReservation(resId) {
+  const reservation = reservationsList.find(item => item.id === resId);
+  if (!reservation || reservation.status !== 'Pending') return;
 
-  reservationsList = reservationsList.filter(r => r.id !== resId);
+  document.getElementById('cancelReservationId').textContent = reservation.id;
+  document.getElementById('cancelEquipmentName').textContent = reservation.equipmentName;
+  document.getElementById('cancelReservationIcon').textContent = '!';
+  document.getElementById('cancelReservationIcon').classList.add('reservation-cancel-icon');
+  document.getElementById('cancelReservationTitle').textContent = 'Cancel this reservation?';
+  document.getElementById('cancelReservationMessage').textContent = 'Are you sure you want to cancel this pending request?';
+  document.getElementById('cancelReservationError').classList.add('hidden');
+  document.getElementById('btnKeepReservation').classList.remove('hidden');
+  document.getElementById('btnConfirmCancellation').classList.remove('hidden');
+  document.getElementById('btnViewReservationsAfterCancel').classList.add('hidden');
+  document.getElementById('cancelReservationModal').classList.remove('hidden');
+  document.getElementById('btnConfirmCancellation').focus();
+}
 
+async function confirmReservationCancellation() {
+  const resId = document.getElementById('cancelReservationId').textContent;
+  const button = document.getElementById('btnConfirmCancellation');
+  const errorNotice = document.getElementById('cancelReservationError');
+  if (!resId) return;
+
+  button.disabled = true;
+  errorNotice.classList.add('hidden');
   try {
-    await fetch(`/api/reservations/${resId}`, { method: 'DELETE' });
-  } catch (err) { console.warn(err); }
+    const response = await apiFetch(`/api/reservations/${encodeURIComponent(resId)}`, { method: 'DELETE' });
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      throw new Error('The server returned an unreadable response. Please try again.');
+    }
 
-  renderMyReservations();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to cancel this reservation. Please try again.');
+    }
+
+    reservationsList = reservationsList.filter(reservation => reservation.id !== resId);
+    renderMyReservations();
+    document.getElementById('cancelReservationIcon').textContent = '✓';
+    document.getElementById('cancelReservationIcon').classList.remove('reservation-cancel-icon');
+    document.getElementById('cancelReservationTitle').textContent = 'Reservation cancelled';
+    document.getElementById('cancelReservationMessage').textContent = 'Your pending reservation has been cancelled.';
+    document.getElementById('btnKeepReservation').classList.add('hidden');
+    button.classList.add('hidden');
+    document.getElementById('btnViewReservationsAfterCancel').classList.remove('hidden');
+    document.getElementById('btnViewReservationsAfterCancel').focus();
+  } catch (err) {
+    errorNotice.textContent = err.message || 'Unable to cancel this reservation. Please try again.';
+    errorNotice.classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function openAddInventoryModal() {
@@ -599,7 +741,7 @@ async function handleInventorySubmit(e) {
   const button = document.getElementById('btnSaveInventory');
   button.disabled = true;
   try {
-    const response = await fetch(id ? `/api/equipment/${encodeURIComponent(id)}` : '/api/equipment', {
+    const response = await apiFetch(id ? `/api/equipment/${encodeURIComponent(id)}` : '/api/equipment', {
       method: id ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, category, totalQty, labLocation })
@@ -625,14 +767,17 @@ async function handleInventorySubmit(e) {
 
 async function deleteEquipment(eqId) {
   if (!confirm('Are you sure you want to delete this equipment item from inventory?')) return;
-
-  equipmentList = equipmentList.filter(e => e.id !== eqId);
-
   try {
-    await fetch(`/api/equipment/${eqId}`, { method: 'DELETE' });
-  } catch (err) { console.warn(err); }
+    const response = await apiFetch(`/api/equipment/${encodeURIComponent(eqId)}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to remove equipment.');
 
-  renderInventory();
+    equipmentList = equipmentList.filter(e => e.id !== eqId);
+    renderInventory();
+    renderCatalog();
+  } catch (err) {
+    alert(err.message || 'Unable to remove equipment. Please try again.');
+  }
 }
 
 function closeModal(modalId) {

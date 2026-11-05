@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const { randomBytes } = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const projectEnvPath = path.join(__dirname, '.env');
 const workspaceEnvLocalPath = path.join(__dirname, '..', '.env.local');
@@ -26,6 +27,7 @@ const supabaseAdmin = supabaseUrl && supabaseServiceRoleKey
     auth: { autoRefreshToken: false, persistSession: false }
   })
   : null;
+const reservationSelect = 'id, user_id, equipment_id, qty, reservation_date, time_slot, purpose, status, remarks, created_at, users!inner(full_name, email), equipment!inner(name)';
 
 function createSupabaseAuthClient() {
   if (!supabaseUrl || !supabaseAnonKey) return null;
@@ -63,19 +65,100 @@ async function findUserProfile(identifier) {
   return data;
 }
 
-let equipment = [
-  { id: 'EQ-101', name: 'Digital Storage Oscilloscope 100MHz', category: 'Testing Tools', totalQty: 8, availableQty: 6, labLocation: 'Embedded Systems Lab', status: 'Available' },
-  { id: 'EQ-102', name: 'PIC16F877A Microcontroller Trainer Kit', category: 'Microcontrollers', totalQty: 15, availableQty: 12, labLocation: 'Hardware Lab 2', status: 'Available' },
-  { id: 'EQ-103', name: '8051 Microcontroller Evaluation Board', category: 'Microcontrollers', totalQty: 10, availableQty: 8, labLocation: 'Hardware Lab 1', status: 'Available' },
-  { id: 'EQ-104', name: 'Digital Logic Gate Experimenter Kit', category: 'Logic Circuits', totalQty: 20, availableQty: 18, labLocation: 'Digital Circuits Lab', status: 'Available' },
-  { id: 'EQ-105', name: 'ESP32 IoT Development Node Kit', category: 'IoT & Edge', totalQty: 25, availableQty: 20, labLocation: 'Embedded Systems Lab', status: 'Available' },
-  { id: 'EQ-106', name: 'Handheld True-RMS Digital Multimeter', category: 'Testing Tools', totalQty: 30, availableQty: 25, labLocation: 'General COE Lab', status: 'Available' }
-];
+function asyncRoute(handler) {
+  return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+}
 
-let reservations = [
-  { id: 'RES-1001', userId: '1', userName: 'Samantha Regalado', equipmentId: 'EQ-101', equipmentName: 'Digital Storage Oscilloscope 100MHz', qty: 1, reservationDate: '2026-11-05', timeSlot: '09:00 AM - 12:00 PM', purpose: 'Digital Signal Processing Lab Activity #4', status: 'Pending', remarks: 'Awaiting faculty approval' },
-  { id: 'RES-1002', userId: '1', userName: 'Samantha Regalado', equipmentId: 'EQ-105', equipmentName: 'ESP32 IoT Development Node Kit', qty: 2, reservationDate: '2026-11-03', timeSlot: '01:00 PM - 04:00 PM', purpose: 'Edge-Based Irrigation Capstone Testing', status: 'Approved', remarks: 'Approved. Handle with care.' }
-];
+function requireSession(req, res, next) {
+  const authorization = req.get('authorization') || '';
+  const accessToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  const authClient = createSupabaseAuthClient();
+  if (!accessToken) {
+    return res.status(401).json({ success: false, message: 'Your session is invalid. Please sign in again.' });
+  }
+  if (!authClient || !supabaseAdmin) {
+    return res.status(503).json({ success: false, message: 'Supabase is not fully configured on the server.' });
+  }
+
+  authClient.auth.getUser(accessToken)
+    .then(({ data, error }) => {
+      if (error || !data.user) {
+        return res.status(401).json({ success: false, message: 'Your session is invalid. Please sign in again.' });
+      }
+
+      return supabaseAdmin
+        .from('users')
+        .select('id, auth_user_id, id_number, full_name, email, role')
+        .eq('auth_user_id', data.user.id)
+        .maybeSingle()
+        .then(({ data: profile, error: profileError }) => {
+          if (profileError) {
+            console.error('Supabase profile lookup failed:', profileError.message);
+            return res.status(503).json({ success: false, message: 'Unable to load your account profile.' });
+          }
+          if (!profile) {
+            return res.status(403).json({ success: false, message: 'Your account profile is not set up. Contact the administrator.' });
+          }
+
+          req.profile = profile;
+          req.authUser = data.user;
+          next();
+        });
+    })
+    .catch(error => {
+      console.error('Supabase session validation failed:', error.message);
+      res.status(503).json({ success: false, message: 'Unable to validate your session.' });
+    });
+}
+
+function requireStaff(req, res, next) {
+  if (req.profile.role === 'STUDENT') {
+    return res.status(403).json({ success: false, message: 'Only faculty and administrators can perform this action.' });
+  }
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  if (req.profile.role !== 'ADMIN') {
+    return res.status(403).json({ success: false, message: 'Only administrators can perform this action.' });
+  }
+  next();
+}
+
+function toPublicEquipment(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    totalQty: row.total_qty,
+    availableQty: row.available_qty,
+    labLocation: row.lab_location,
+    status: row.status
+  };
+}
+
+function toPublicReservation(row) {
+  const user = Array.isArray(row.users) ? row.users[0] : row.users;
+  const item = Array.isArray(row.equipment) ? row.equipment[0] : row.equipment;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    userName: user.full_name,
+    equipmentId: row.equipment_id,
+    equipmentName: item.name,
+    qty: row.qty,
+    reservationDate: row.reservation_date,
+    timeSlot: row.time_slot,
+    purpose: row.purpose,
+    status: row.status,
+    remarks: row.remarks,
+    createdAt: row.created_at
+  };
+}
+
+function createReservationId() {
+  return `RES-${randomBytes(8).toString('hex').toUpperCase()}`;
+}
 
 // --- AUTH ROUTES ---
 app.get('/api/config', (req, res) => {
@@ -173,33 +256,121 @@ app.post('/api/auth/profile', async (req, res) => {
   res.json({ success: true, user: toPublicUser(profile) });
 });
 
+app.post('/api/admin/users', requireSession, requireAdmin, asyncRoute(async (req, res) => {
+  const body = req.body || {};
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const idNumber = typeof body.idNumber === 'string' ? body.idNumber.trim() : '';
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+  const role = body.role;
+
+  if (
+    !name || name.length > 100 ||
+    !idNumber || idNumber.length > 50 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 100 ||
+    password.length < 8 || password.length > 128 ||
+    !['STUDENT', 'INSTRUCTOR'].includes(role)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Enter a valid name, ID, email, student/faculty role, and password between 8 and 128 characters.'
+    });
+  }
+
+  const { data: emailProfile, error: emailLookupError } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+  if (emailLookupError) {
+    console.error('Supabase user email lookup failed:', emailLookupError.message);
+    return res.status(503).json({ success: false, message: 'Unable to verify whether this email is already in use.' });
+  }
+  if (emailProfile) {
+    return res.status(409).json({ success: false, message: 'An account with this email already exists.' });
+  }
+
+  const { data: idProfile, error: idLookupError } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('id_number', idNumber)
+    .maybeSingle();
+  if (idLookupError) {
+    console.error('Supabase user ID lookup failed:', idLookupError.message);
+    return res.status(503).json({ success: false, message: 'Unable to verify whether this ID is already in use.' });
+  }
+  if (idProfile) {
+    return res.status(409).json({ success: false, message: 'This student/faculty ID is already in use.' });
+  }
+
+  const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: name, id_number: idNumber }
+  });
+  if (createError || !created.user) {
+    if (createError?.status === 422 || createError?.code === 'email_exists') {
+      return res.status(409).json({ success: false, message: 'An account with this email already exists.' });
+    }
+    console.error('Supabase admin account creation failed:', createError?.message || 'Supabase returned no user.');
+    return res.status(503).json({ success: false, message: 'Unable to create the account in Supabase.' });
+  }
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('users')
+    .update({ full_name: name, id_number: idNumber, email, role })
+    .eq('auth_user_id', created.user.id)
+    .select('id, id_number, full_name, email, role')
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    const { error: cleanupError } = await supabaseAdmin.auth.admin.deleteUser(created.user.id);
+    if (cleanupError) {
+      console.error('Supabase account rollback failed:', cleanupError.message);
+      return res.status(503).json({
+        success: false,
+        message: 'The login account was created, but its profile could not be set up or rolled back. Contact the administrator.'
+      });
+    }
+    console.error('Supabase account profile setup failed:', profileError?.message || 'Auth profile trigger did not create a profile.');
+    return res.status(503).json({ success: false, message: 'Unable to finish setting up the account. The incomplete login was removed.' });
+  }
+
+  res.status(201).json({
+    success: true,
+    user: {
+      idNumber: profile.id_number,
+      name: profile.full_name,
+      email: profile.email,
+      role: profile.role
+    }
+  });
+}));
+
 // --- EQUIPMENT ROUTES (CRUD) ---
 // READ: Get all equipment
-app.get('/api/equipment', (req, res) => {
-  res.json(equipment);
-});
+app.get('/api/equipment', asyncRoute(async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ success: false, message: 'Supabase is not configured on the server.' });
+  }
 
-// CREATE: Add new equipment (Staff/Admin)
-app.post('/api/equipment', (req, res) => {
-  const { name, category, totalQty, labLocation } = req.body;
-  const newEq = {
-    id: `EQ-${Math.floor(100 + Math.random() * 900)}`,
-    name,
-    category,
-    totalQty: parseInt(totalQty),
-    availableQty: parseInt(totalQty),
-    labLocation,
-    status: 'Available'
-  };
-  equipment.push(newEq);
-  res.status(201).json({ success: true, equipment: newEq });
-});
+  const { data, error } = await supabaseAdmin
+    .from('equipment')
+    .select('id, name, category, total_qty, available_qty, lab_location, status')
+    .order('name');
+  if (error) {
+    console.error('Supabase equipment lookup failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Unable to load equipment from the database.' });
+  }
+  res.json(data.map(toPublicEquipment));
+}));
 
-// UPDATE: Edit equipment (Staff/Admin)
-app.put('/api/equipment/:id', (req, res) => {
-  const { id } = req.params;
-  const index = equipment.findIndex(e => e.id === id);
-  if (index === -1) return res.status(404).json({ success: false, message: 'Item not found' });
+// CREATE: Add new equipment (Admin)
+app.post('/api/equipment', requireSession, requireAdmin, asyncRoute(async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ success: false, message: 'Supabase is not configured on the server.' });
+  }
 
   const body = req.body || {};
   const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -210,8 +381,57 @@ app.put('/api/equipment/:id', (req, res) => {
     return res.status(400).json({ success: false, message: 'Enter valid equipment details and a total quantity of at least 1.' });
   }
 
-  const currentEquipment = equipment[index];
-  const checkedOutQty = currentEquipment.totalQty - currentEquipment.availableQty;
+  const row = {
+    id: `EQ-${randomBytes(5).toString('hex').toUpperCase()}`,
+    name,
+    category,
+    total_qty: totalQty,
+    available_qty: totalQty,
+    lab_location: labLocation,
+    status: 'Available'
+  };
+  const { data, error } = await supabaseAdmin
+    .from('equipment')
+    .insert(row)
+    .select('id, name, category, total_qty, available_qty, lab_location, status')
+    .single();
+  if (error) {
+    console.error('Supabase equipment creation failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Unable to add equipment to the database.' });
+  }
+  res.status(201).json({ success: true, equipment: toPublicEquipment(data) });
+}));
+
+// UPDATE: Edit equipment (Admin)
+app.put('/api/equipment/:id', requireSession, requireAdmin, asyncRoute(async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ success: false, message: 'Supabase is not configured on the server.' });
+  }
+
+  const body = req.body || {};
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const category = typeof body.category === 'string' ? body.category.trim() : '';
+  const labLocation = typeof body.labLocation === 'string' ? body.labLocation.trim() : '';
+  const totalQty = Number(body.totalQty);
+  if (!name || !category || !labLocation || !Number.isInteger(totalQty) || totalQty < 1) {
+    return res.status(400).json({
+      success: false,
+      message: 'Enter valid equipment details and a total quantity of at least 1.'
+    });
+  }
+
+  const { data: current, error: lookupError } = await supabaseAdmin
+    .from('equipment')
+    .select('total_qty, available_qty, status')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (lookupError) {
+    console.error('Supabase equipment lookup failed:', lookupError.message);
+    return res.status(503).json({ success: false, message: 'Unable to load the equipment item.' });
+  }
+  if (!current) return res.status(404).json({ success: false, message: 'Item not found.' });
+
+  const checkedOutQty = current.total_qty - current.available_qty;
   if (totalQty < checkedOutQty) {
     return res.status(400).json({
       success: false,
@@ -219,96 +439,219 @@ app.put('/api/equipment/:id', (req, res) => {
     });
   }
 
-  equipment[index] = {
-    ...currentEquipment,
-    name,
-    category,
-    totalQty,
-    availableQty: totalQty - checkedOutQty,
-    labLocation,
-    status: currentEquipment.status === 'Maintenance'
-      ? 'Maintenance'
-      : (totalQty === checkedOutQty ? 'Depleted' : 'Available')
-  };
-  res.json({ success: true, equipment: equipment[index] });
-});
+  const { data, error } = await supabaseAdmin
+    .from('equipment')
+    .update({
+      name,
+      category,
+      total_qty: totalQty,
+      available_qty: totalQty - checkedOutQty,
+      lab_location: labLocation,
+      status: current.status === 'Maintenance'
+        ? 'Maintenance'
+        : (totalQty === checkedOutQty ? 'Depleted' : 'Available')
+    })
+    .eq('id', req.params.id)
+    .select('id, name, category, total_qty, available_qty, lab_location, status')
+    .maybeSingle();
+  if (error) {
+    console.error('Supabase equipment update failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Unable to update equipment in the database.' });
+  }
+  if (!data) return res.status(404).json({ success: false, message: 'Item not found.' });
+  res.json({ success: true, equipment: toPublicEquipment(data) });
+}));
 
-// DELETE: Remove equipment (Staff/Admin)
-app.delete('/api/equipment/:id', (req, res) => {
-  const { id } = req.params;
-  equipment = equipment.filter(e => e.id !== id);
-  res.json({ success: true, message: 'Equipment removed successfully' });
-});
+// DELETE: Remove equipment only when it has no reservation history.
+app.delete('/api/equipment/:id', requireSession, requireAdmin, asyncRoute(async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ success: false, message: 'Supabase is not configured on the server.' });
+  }
+
+  const { count, error: reservationError } = await supabaseAdmin
+    .from('reservations')
+    .select('id', { count: 'exact', head: true })
+    .eq('equipment_id', req.params.id);
+  if (reservationError) {
+    console.error('Supabase reservation lookup failed:', reservationError.message);
+    return res.status(503).json({ success: false, message: 'Unable to verify equipment reservation history.' });
+  }
+  if (count > 0) {
+    return res.status(409).json({ success: false, message: 'Equipment with reservation history cannot be removed.' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('equipment')
+    .delete()
+    .eq('id', req.params.id)
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    console.error('Supabase equipment deletion failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Unable to remove equipment from the database.' });
+  }
+  if (!data) return res.status(404).json({ success: false, message: 'Item not found.' });
+  res.json({ success: true, message: 'Equipment removed successfully.' });
+}));
 
 // --- RESERVATIONS ROUTES (CRUD) ---
-// READ: Get all or user-specific reservations
-app.get('/api/reservations', (req, res) => {
-  const { userId } = req.query;
-  if (userId) {
-    const userRes = reservations.filter(r => r.userId === userId);
-    return res.json(userRes);
+// Students can see their reservations; faculty/admin can see all.
+app.get('/api/reservations', requireSession, asyncRoute(async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ success: false, message: 'Supabase is not configured on the server.' });
   }
-  res.json(reservations);
-});
 
-// CREATE: Submit new reservation request (Student)
-app.post('/api/reservations', (req, res) => {
-  const { userId, userName, equipmentId, qty, reservationDate, timeSlot, purpose } = req.body;
-  
-  const eq = equipment.find(e => e.id === equipmentId);
-  if (!eq) return res.status(404).json({ success: false, message: 'Equipment not found' });
-  if (eq.availableQty < qty) return res.status(400).json({ success: false, message: 'Insufficient stock available' });
+  let query = supabaseAdmin
+    .from('reservations')
+    .select(reservationSelect)
+    .order('created_at', { ascending: false });
+  if (req.profile.role === 'STUDENT') {
+    query = query.eq('user_id', req.profile.id);
+  }
 
-  const newReservation = {
-    id: `RES-${Math.floor(1000 + Math.random() * 9000)}`,
-    userId,
-    userName,
-    equipmentId,
-    equipmentName: eq.name,
-    qty: parseInt(qty),
-    reservationDate,
-    timeSlot,
-    purpose,
-    status: 'Pending',
-    remarks: 'Awaiting faculty approval'
-  };
+  const { data, error } = await query;
+  if (error) {
+    console.error('Supabase reservation lookup failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Unable to load reservations from the database.' });
+  }
+  res.json(data.map(toPublicReservation));
+}));
 
-  reservations.push(newReservation);
-  res.status(201).json({ success: true, reservation: newReservation });
-});
+// CREATE: Submit a reservation for the authenticated student.
+app.post('/api/reservations', requireSession, asyncRoute(async (req, res) => {
+  if (req.profile.role !== 'STUDENT') {
+    return res.status(403).json({ success: false, message: 'Only students can submit reservations.' });
+  }
+  if (!supabaseAdmin) {
+    return res.status(503).json({ success: false, message: 'Supabase is not configured on the server.' });
+  }
 
-// UPDATE: Change status / remarks (Staff/Admin)
-app.patch('/api/reservations/:id', (req, res) => {
-  const { id } = req.params;
-  const { status, remarks } = req.body;
-  
-  const resItem = reservations.find(r => r.id === id);
-  if (!resItem) return res.status(404).json({ success: false, message: 'Reservation not found' });
+  const body = req.body || {};
+  const equipmentId = typeof body.equipmentId === 'string' ? body.equipmentId : '';
+  const qty = Number(body.qty);
+  const reservationDate = typeof body.reservationDate === 'string' ? body.reservationDate : '';
+  const timeSlot = typeof body.timeSlot === 'string' ? body.timeSlot.trim() : '';
+  const purpose = typeof body.purpose === 'string' ? body.purpose.trim() : '';
+  if (!equipmentId || !Number.isInteger(qty) || qty < 1 || !reservationDate || !timeSlot || !purpose) {
+    return res.status(400).json({ success: false, message: 'Enter valid equipment, quantity, date, time slot, and purpose.' });
+  }
 
-  resItem.status = status;
-  if (remarks) resItem.remarks = remarks;
+  const { data: item, error: equipmentError } = await supabaseAdmin
+    .from('equipment')
+    .select('id, available_qty')
+    .eq('id', equipmentId)
+    .maybeSingle();
+  if (equipmentError) {
+    console.error('Supabase equipment lookup failed:', equipmentError.message);
+    return res.status(503).json({ success: false, message: 'Unable to check equipment availability.' });
+  }
+  if (!item) return res.status(404).json({ success: false, message: 'Equipment not found.' });
+  if (item.available_qty < qty) {
+    return res.status(400).json({ success: false, message: 'Insufficient stock available.' });
+  }
 
-  // Deduct stock if approved
-  if (status === 'Approved') {
-    const eq = equipment.find(e => e.id === resItem.equipmentId);
-    if (eq && eq.availableQty >= resItem.qty) {
-      eq.availableQty -= resItem.qty;
+  const { data, error } = await supabaseAdmin
+    .from('reservations')
+    .insert({
+      id: createReservationId(),
+      user_id: req.profile.id,
+      equipment_id: item.id,
+      qty,
+      reservation_date: reservationDate,
+      time_slot: timeSlot,
+      purpose,
+      status: 'Pending',
+      remarks: 'Awaiting faculty approval'
+    })
+    .select(reservationSelect)
+    .single();
+  if (error) {
+    console.error('Supabase reservation creation failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Unable to save the reservation. Please try again.' });
+  }
+  res.status(201).json({ success: true, reservation: toPublicReservation(data) });
+}));
+
+// UPDATE: Save the faculty decision before sending the student email.
+app.patch('/api/reservations/:id', requireSession, requireStaff, asyncRoute(async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ success: false, message: 'Supabase is not configured on the server.' });
+  }
+
+  const body = req.body || {};
+  const status = body.status;
+  const remarks = typeof body.remarks === 'string' ? body.remarks.trim() : '';
+  if (!['Approved', 'Rejected'].includes(status) || !remarks || remarks.length > 2000) {
+    return res.status(400).json({ success: false, message: 'Choose Accepted or Rejected and enter faculty remarks (up to 2000 characters).' });
+  }
+
+  const { data: currentReservation, error: lookupError } = await supabaseAdmin
+    .from('reservations')
+    .select(reservationSelect)
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (lookupError) {
+    console.error('Supabase reservation lookup failed before decision:', lookupError.message);
+    return res.status(503).json({ success: false, message: 'Unable to load the reservation.' });
+  }
+  if (!currentReservation) {
+    return res.status(404).json({ success: false, message: 'Reservation not found.' });
+  }
+
+  const { error: decisionError } = await supabaseAdmin.rpc('process_reservation_decision', {
+    p_reservation_id: req.params.id,
+    p_status: status,
+    p_remarks: remarks
+  });
+  if (decisionError) {
+    if (decisionError.code === 'P0002') {
+      return res.status(404).json({ success: false, message: 'Reservation not found.' });
     }
+    if (decisionError.code === '23514') {
+      return res.status(409).json({ success: false, message: decisionError.message });
+    }
+    console.error('Supabase reservation decision failed:', decisionError.message);
+    return res.status(503).json({ success: false, message: 'Unable to save the reservation decision.' });
   }
 
-  res.json({ success: true, reservation: resItem });
-});
+  const reservation = { ...currentReservation, status, remarks };
+  res.json({
+    success: true,
+    reservation: toPublicReservation(reservation)
+  });
+}));
 
-// DELETE: Cancel pending reservation (Student)
-app.delete('/api/reservations/:id', (req, res) => {
-  const { id } = req.params;
-  const index = reservations.findIndex(r => r.id === id);
-  
-  if (index !== -1) {
-    const deleted = reservations.splice(index, 1)[0];
-    return res.json({ success: true, message: 'Reservation cancelled', reservation: deleted });
+// DELETE: Student can cancel only their own pending reservation.
+app.delete('/api/reservations/:id', requireSession, asyncRoute(async (req, res) => {
+  if (req.profile.role !== 'STUDENT') {
+    return res.status(403).json({ success: false, message: 'Only students can cancel reservations.' });
   }
-  res.status(404).json({ success: false, message: 'Reservation not found' });
+  if (!supabaseAdmin) {
+    return res.status(503).json({ success: false, message: 'Supabase is not configured on the server.' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('reservations')
+    .delete()
+    .eq('id', req.params.id)
+    .eq('user_id', req.profile.id)
+    .eq('status', 'Pending')
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    console.error('Supabase reservation cancellation failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Unable to cancel the reservation.' });
+  }
+  if (!data) {
+    return res.status(404).json({ success: false, message: 'Pending reservation not found for this account.' });
+  }
+  res.json({ success: true, message: 'Reservation cancelled.' });
+}));
+
+app.use((error, req, res, next) => {
+  console.error('Unhandled API error:', error.message);
+  if (res.headersSent) return next(error);
+  res.status(500).json({ success: false, message: 'An unexpected server error occurred.' });
 });
 
 // Serve Single Page Application Fallback
