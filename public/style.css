@@ -554,6 +554,11 @@ body {
   font-weight: 700;
 }
 
+.reservation-cancel-icon {
+  background: #FEF3C7;
+  color: #B45309;
+}
+
 .reservation-success-dialog h3 {
   font-size: 1.25rem;
 }
