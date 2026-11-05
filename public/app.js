@@ -45,11 +45,6 @@ async function initializeSupabaseAuth() {
       return;
     }
 
-    if (queryParams.get('flow') === 'reset' || hashParams.get('type') === 'recovery') {
-      showPasswordUpdate();
-      return;
-    }
-
     const { data, error } = await supabaseClient.auth.getSession();
     if (error) throw error;
     if (data.session) {
@@ -81,35 +76,9 @@ function switchAuthTab(type) {
   tabSignup.setAttribute('aria-selected', String(!isSignin));
   signinPanel.classList.toggle('hidden', !isSignin);
   signupPanel.classList.toggle('hidden', isSignin);
-  document.getElementById('passwordResetRequestPanel').classList.add('hidden');
-  document.getElementById('passwordUpdatePanel').classList.add('hidden');
   setAuthNotice(isSignin
     ? 'Faculty and staff accounts are provided by the administrator. Use the ID and password issued to you.'
     : 'Student accounts only. Faculty and staff should contact the administrator for their account.', '');
-}
-
-function showPasswordReset() {
-  document.getElementById('authTabs').classList.add('hidden');
-  document.getElementById('signinPanel').classList.add('hidden');
-  document.getElementById('signupPanel').classList.add('hidden');
-  document.getElementById('passwordUpdatePanel').classList.add('hidden');
-  document.getElementById('passwordResetRequestPanel').classList.remove('hidden');
-  const identifier = document.getElementById('authIdentifier').value.trim();
-  document.getElementById('resetEmail').value = identifier.includes('@') ? identifier : '';
-  setAuthNotice('', '');
-}
-
-function showPasswordUpdate() {
-  document.getElementById('authTabs').classList.add('hidden');
-  document.getElementById('signinPanel').classList.add('hidden');
-  document.getElementById('signupPanel').classList.add('hidden');
-  document.getElementById('passwordResetRequestPanel').classList.add('hidden');
-  document.getElementById('passwordUpdatePanel').classList.remove('hidden');
-  setAuthNotice('Enter a new password for your account.', '');
-}
-
-function returnToSignIn() {
-  switchAuthTab('signin');
 }
 
 function setAuthNotice(message, type) {
@@ -218,56 +187,6 @@ async function handleStudentSignUp(e) {
     }
   } catch (err) {
     setAuthNotice(err.message || 'Unable to create your account. Please try again.', 'error');
-  } finally {
-    button.disabled = false;
-  }
-}
-
-async function handlePasswordResetRequest(e) {
-  e.preventDefault();
-  if (!supabaseClient) {
-    setAuthNotice('Supabase is not ready. Check its configuration and reload the page.', 'error');
-    return;
-  }
-
-  const email = document.getElementById('resetEmail').value.trim().toLowerCase();
-  const button = document.getElementById('btnRequestReset');
-  button.disabled = true;
-  setAuthNotice('Sending password reset email...', '');
-  try {
-    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/?flow=reset`
-    });
-    if (error) throw error;
-    setAuthNotice('If an account exists for this email, a password reset link has been sent. If you do not receive one, the email does not exists.', 'success');
-  } catch (err) {
-    setAuthNotice(err.message || 'Unable to send the reset email. Please try again.', 'error');
-  } finally {
-    button.disabled = false;
-  }
-}
-
-async function handlePasswordUpdate(e) {
-  e.preventDefault();
-  if (!supabaseClient) {
-    setAuthNotice('Supabase is not ready. Check its configuration and reload the page.', 'error');
-    return;
-  }
-
-  const button = document.getElementById('btnUpdatePassword');
-  const password = document.getElementById('newPassword').value;
-  button.disabled = true;
-  setAuthNotice('Updating your password...', '');
-  try {
-    const { error } = await supabaseClient.auth.updateUser({ password });
-    if (error) throw error;
-    await supabaseClient.auth.signOut();
-    document.getElementById('passwordUpdatePanel').reset();
-    window.history.replaceState({}, document.title, window.location.pathname);
-    switchAuthTab('signin');
-    setAuthNotice('Password updated. Sign in with your new password.', 'success');
-  } catch (err) {
-    setAuthNotice(err.message || 'Unable to update your password. Request a new reset link.', 'error');
   } finally {
     button.disabled = false;
   }
