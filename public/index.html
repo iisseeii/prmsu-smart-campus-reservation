@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Campus Equipment & Lab Reservation | PRMSU COE</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- AUTHENTICATION VIEW (Split-Screen Landing Page) -->
+  <div id="authContainer" class="auth-wrapper">
+    <!-- Left Panel: PRMSU COE Branding -->
+    <div class="brand-panel">
+      <div class="brand-content">
+        <div class="brand-badge">
+          <svg class="beaker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4.5 3h15M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3M6 14h12M9 3v4m6-4v4"></path>
+          </svg>
+          <span>PRMSU COLLEGE OF ENGINEERING</span>
+        </div>
+        <h1 class="brand-title">Smart Campus Equipment & Lab Reservation</h1>
+        <p class="brand-subtitle">Browse equipment, book lab time, and manage approvals without the paper trail.</p>
+        <ul class="brand-features">
+          <li>Real-time equipment stock and lab schedule tracking</li>
+          <li>Fast staff review and reservation status updates</li>
+          <li>Clear reservation records for students and faculty</li>
+        </ul>
+      </div>
+      <div class="brand-footer">
+        Computer Engineering Dept. &middot; PRMSU Main Campus
+      </div>
+    </div>
+
+    <!-- Right Panel: Sign In / Student Sign Up -->
+    <div class="form-panel">
+      <div class="auth-card">
+        <div id="authTabs" class="auth-tabs" role="tablist" aria-label="Account access">
+          <button id="tabSignin" class="tab-btn active" role="tab" aria-selected="true" aria-controls="signinPanel" onclick="switchAuthTab('signin')">Sign In</button>
+          <button id="tabSignup" class="tab-btn" role="tab" aria-selected="false" aria-controls="signupPanel" onclick="switchAuthTab('signup')">Student Sign Up</button>
+        </div>
+
+        <form id="signinPanel" role="tabpanel" aria-labelledby="tabSignin" onsubmit="handleSignIn(event)">
+          <div class="form-group">
+            <label for="authIdentifier" class="form-label">ID</label>
+            <input type="text" id="authIdentifier" class="form-input" placeholder="Enter your student/faculty ID or email" autocomplete="username" required>
+          </div>
+
+          <div class="form-group">
+            <label for="authPassword" class="form-label">Password</label>
+            <input type="password" id="authPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password" required>
+          </div>
+
+          <button type="submit" id="btnSignIn" class="btn-primary full-width">Sign In to Portal <span aria-hidden="true">&rarr;</span></button>
+          <button type="button" class="auth-link" onclick="showPasswordReset()">Forgot password?</button>
+        </form>
+
+        <form id="signupPanel" class="hidden" role="tabpanel" aria-labelledby="tabSignup" onsubmit="handleStudentSignUp(event)">
+          <div class="form-group">
+            <label for="signupName" class="form-label">Full Name</label>
+            <input type="text" id="signupName" class="form-input" placeholder="e.g. Maria Santos" autocomplete="name" required>
+          </div>
+          <div class="form-group">
+            <label for="signupId" class="form-label">PRMSU Student ID</label>
+            <input type="text" id="signupId" class="form-input" placeholder="e.g. 22-CpE-0891" autocomplete="username" required>
+          </div>
+          <div class="form-group">
+            <label for="signupEmail" class="form-label">Email</label>
+            <input type="email" id="signupEmail" class="form-input" placeholder="name@example.com" autocomplete="email" required>
+          </div>
+          <div class="form-group">
+            <label for="signupPassword" class="form-label">Create Password</label>
+            <input type="password" id="signupPassword" class="form-input" placeholder="At least 8 characters" minlength="8" autocomplete="new-password" required>
+          </div>
+          <button type="submit" id="btnSignUp" class="btn-primary full-width">Create Student Account</button>
+        </form>
+
+        <form id="passwordResetRequestPanel" class="hidden" onsubmit="handlePasswordResetRequest(event)">
+          <h2 class="auth-panel-title">Reset your password</h2>
+          <p class="auth-panel-description">Enter the email address registered to your account. A secure password reset link will be sent to your inbox.</p>
+          <div class="form-group">
+            <label for="resetEmail" class="form-label">Email</label>
+            <input type="email" id="resetEmail" class="form-input" placeholder="name@example.com" autocomplete="email" required>
+          </div>
+          <button type="submit" id="btnRequestReset" class="btn-primary full-width">Email Reset Link</button>
+          <button type="button" class="auth-link" onclick="returnToSignIn()">Back to Sign In</button>
+        </form>
+
+        <form id="passwordUpdatePanel" class="hidden" onsubmit="handlePasswordUpdate(event)">
+          <h2 class="auth-panel-title">Choose a new password</h2>
+          <div class="form-group">
+            <label for="newPassword" class="form-label">New Password</label>
+            <input type="password" id="newPassword" class="form-input" placeholder="At least 8 characters" minlength="8" autocomplete="new-password" required>
+          </div>
+          <button type="submit" id="btnUpdatePassword" class="btn-primary full-width">Save New Password</button>
+        </form>
+
+        <p id="authNotice" class="auth-notice" aria-live="polite">Faculty and staff accounts are provided by the administrator. Use the ID and password issued to you.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN DASHBOARD VIEW (Hidden by default) -->
+  <div id="appContainer" class="app-wrapper hidden">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-logo">
+          <svg class="beaker-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4.5 3h15M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3M6 14h12M9 3v4m6-4v4"></path>
+          </svg>
+          <div>
+            <span class="header-brand-title">PRMSU COE</span>
+            <span class="header-brand-sub">Smart Campus Reservation</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="user-badge">
+          <span id="userDisplayName" class="user-name">Samantha Regalado</span>
+          <span id="userRoleBadge" class="role-pill student">STUDENT</span>
+        </div>
+        <button class="btn-logout" onclick="logout()">Sign Out</button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="app-nav">
+      <div id="studentNav" class="nav-group">
+        <button id="navCatalog" class="nav-btn active" onclick="switchDashboardTab('catalog')">Equipment Catalog</button>
+        <button id="navMyReservations" class="nav-btn" onclick="switchDashboardTab('my-reservations')">My Reservations</button>
+      </div>
+      <div id="adminNav" class="nav-group hidden">
+        <button id="navApprovals" class="nav-btn active" onclick="switchDashboardTab('approvals')">Pending Approvals</button>
+        <button id="navInventory" class="nav-btn" onclick="switchDashboardTab('inventory')">Inventory Manager</button>
+        <button id="navAllLogs" class="nav-btn" onclick="switchDashboardTab('all-logs')">Master Log</button>
+      </div>
+    </nav>
+
+    <!-- Content Sections -->
+    <main class="app-content">
+
+      <!-- STUDENT CATALOG VIEW -->
+      <section id="secCatalog" class="dashboard-section">
+        <div class="section-header">
+          <div>
+            <h2>Hardware Equipment & Lab Assets</h2>
+            <p>Select equipment and request lab slot reservation.</p>
+          </div>
+          <div class="filter-controls">
+            <input type="text" id="catalogSearch" class="form-input search-input" placeholder="Search equipment..." oninput="renderCatalog()">
+            <select id="catalogCategory" class="form-select" onchange="renderCatalog()">
+              <option value="ALL">All Categories</option>
+              <option value="Testing Tools">Testing Tools</option>
+              <option value="Microcontrollers">Microcontrollers</option>
+              <option value="Logic Circuits">Logic Circuits</option>
+              <option value="IoT & Edge">IoT & Edge</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="equipmentGrid" class="cards-grid">
+          <!-- Dynamic equipment cards injected here -->
+        </div>
+      </section>
+
+      <!-- MY RESERVATIONS VIEW -->
+      <section id="secMyReservations" class="dashboard-section hidden">
+        <div class="section-header">
+          <div>
+            <h2>My Reservation Requests</h2>
+            <p>Track current approvals and cancel pending requests.</p>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Req ID</th>
+                <th>Equipment Name</th>
+                <th>Qty</th>
+                <th>Reservation Date</th>
+                <th>Time Slot</th>
+                <th>Status</th>
+                <th>Faculty Remarks</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="tblMyReservations">
+              <!-- Dynamic rows injected here -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ADMIN PENDING APPROVALS VIEW -->
+      <section id="secApprovals" class="dashboard-section hidden">
+        <div class="section-header">
+          <div>
+            <h2>Pending Reservation Approvals</h2>
+            <p>Review student requests, specify remarks, and approve or reject.</p>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Req ID</th>
+                <th>Student Name</th>
+                <th>Equipment</th>
+                <th>Qty</th>
+                <th>Date & Time Slot</th>
+                <th>Purpose</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="tblApprovals">
+              <!-- Dynamic pending rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ADMIN INVENTORY MANAGER VIEW -->
+      <section id="secInventory" class="dashboard-section hidden">
+        <div class="section-header">
+          <div>
+            <h2>Equipment & Lab Inventory Manager</h2>
+            <p>Add new hardware assets, adjust stock quantities, or delete items.</p>
+          </div>
+          <button class="btn-primary" onclick="openAddInventoryModal()">+ Add New Equipment</button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Asset ID</th>
+                <th>Item Name</th>
+                <th>Category</th>
+                <th>Lab Location</th>
+                <th>Available / Total</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tblInventory">
+              <!-- Dynamic inventory rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ADMIN MASTER LOG VIEW -->
+      <section id="secAllLogs" class="dashboard-section hidden">
+        <div class="section-header">
+          <div>
+            <h2>Master Campus Reservation Audit Log</h2>
+            <p>Full institutional transaction history across all laboratories.</p>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Req ID</th>
+                <th>Student Name</th>
+                <th>Equipment Name</th>
+                <th>Qty</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="tblMasterLog">
+              <!-- Dynamic master log rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- BOOKING MODAL -->
+  <div id="bookingModal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalEqName">Reserve Equipment</h3>
+        <button class="modal-close" onclick="closeModal('bookingModal')">&times;</button>
+      </div>
+      <form id="bookingForm" onsubmit="handleBookingSubmit(event)">
+        <input type="hidden" id="modalEqId">
+        <div class="form-group">
+          <label class="form-label">Equipment Category</label>
+          <input type="text" id="modalEqCategory" class="form-input" readonly>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quantity Required</label>
+          <input type="number" id="modalBookingQty" class="form-input" min="1" value="1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reservation Date</label>
+          <input type="date" id="modalBookingDate" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Time Slot</label>
+          <select id="modalBookingSlot" class="form-select">
+            <option value="08:00 AM - 11:00 AM">08:00 AM - 11:00 AM</option>
+            <option value="11:00 AM - 02:00 PM">11:00 AM - 02:00 PM</option>
+            <option value="02:00 PM - 05:00 PM">02:00 PM - 05:00 PM</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Academic Purpose / Subject</label>
+          <textarea id="modalBookingPurpose" class="form-input" rows="3" placeholder="e.g. CpE Elec 3 Laboratory Activity" required></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('bookingModal')">Cancel</button>
+          <button type="submit" class="btn-primary">Submit Reservation Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- REMARKS MODAL (Staff Approval / Rejection) -->
+  <div id="remarksModal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="remarksModalTitle">Process Reservation</h3>
+        <button class="modal-close" onclick="closeModal('remarksModal')">&times;</button>
+      </div>
+      <form onsubmit="handleRemarksSubmit(event)">
+        <input type="hidden" id="remarksResId">
+        <input type="hidden" id="remarksActionType">
+        <div class="form-group">
+          <label class="form-label">Faculty / Staff Remarks</label>
+          <textarea id="modalRemarksText" class="form-input" rows="3" placeholder="e.g. Approved. Please bring your PRMSU ID to the Embedded Systems Lab." required></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('remarksModal')">Cancel</button>
+          <button type="submit" id="btnSubmitRemarks" class="btn-primary">Confirm</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD INVENTORY MODAL -->
+  <div id="inventoryModal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="inventoryModalTitle">Add New Hardware Asset</h3>
+        <button class="modal-close" onclick="closeModal('inventoryModal')">&times;</button>
+      </div>
+      <form id="inventoryForm" onsubmit="handleInventorySubmit(event)">
+        <input type="hidden" id="inventoryId">
+        <div class="form-group">
+          <label class="form-label">Equipment Name</label>
+          <input type="text" id="invName" class="form-input" placeholder="e.g. Analog Discovery 2 Kit" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select id="invCategory" class="form-select">
+            <option value="Testing Tools">Testing Tools</option>
+            <option value="Microcontrollers">Microcontrollers</option>
+            <option value="Logic Circuits">Logic Circuits</option>
+            <option value="IoT & Edge">IoT & Edge</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Total Quantity</label>
+          <input type="number" id="invTotalQty" class="form-input" min="1" value="10" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lab Location</label>
+          <input type="text" id="invLocation" class="form-input" placeholder="e.g. Embedded Systems Lab" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('inventoryModal')">Cancel</button>
+          <button type="submit" id="btnSaveInventory" class="btn-primary">Save to Inventory</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/vendor/supabase.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

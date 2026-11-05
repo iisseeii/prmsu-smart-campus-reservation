@@ -1,0 +1,565 @@
+/* PRMSU College of Engineering Brand Colors & CSS Stylesheet */
+:root {
+  --navy-dark: #0A1329;
+  --navy-panel: #111C38;
+  --orange-primary: #E87900;
+  --orange-hover: #C96500;
+  --blue-primary: #2563EB;
+  --blue-hover: #1D4ED8;
+  --blue-light: #EFF6FF;
+  --bg-main: #F8FAFC;
+  --text-dark: #0F172A;
+  --text-muted: #64748B;
+  --border-color: #E2E8F0;
+  --white: #FFFFFF;
+  --status-pending: #D97706;
+  --status-approved: #16A34A;
+  --status-rejected: #DC2626;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+
+/* --- SPLIT-SCREEN AUTHENTICATION LAYOUT --- */
+.auth-wrapper {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.brand-panel {
+  flex: 0 0 45%;
+  background-color: var(--navy-dark);
+  color: var(--white);
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(232, 121, 0, 0.14);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #F59E0B;
+  margin-bottom: 2rem;
+}
+
+.beaker-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.brand-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+
+.brand-subtitle {
+  color: #94A3B8;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  margin-bottom: 2.5rem;
+  max-width: 480px;
+}
+
+.brand-features {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.25rem 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  list-style: none;
+  color: #CBD5E1;
+  font-size: 0.9rem;
+}
+
+.brand-features li::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.65rem;
+  border-radius: 50%;
+  background: var(--orange-primary);
+}
+
+.brand-footer {
+  color: #64748B;
+  font-size: 0.85rem;
+  margin-top: 2rem;
+}
+
+/* Auth Right Form Panel */
+.form-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-color: var(--white);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--white);
+  padding: 1rem;
+}
+
+.auth-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 1.5rem;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 0.75rem;
+  background: none;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+
+.tab-btn.active {
+  color: var(--orange-primary);
+  border-bottom-color: var(--orange-primary);
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  color: var(--text-dark);
+}
+
+.form-input, .form-select {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus, .form-select:focus {
+  outline: none;
+  border-color: var(--orange-primary);
+  box-shadow: 0 0 0 3px rgba(232, 121, 0, 0.12);
+}
+
+.btn-primary {
+  background-color: var(--orange-primary);
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: var(--orange-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.btn-secondary {
+  background-color: #E2E8F0;
+  color: var(--text-dark);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.auth-notice {
+  margin-top: 1.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.auth-link {
+  display: block;
+  margin: 0.9rem 0 0 auto;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--orange-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+.auth-panel-title {
+  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+}
+
+.auth-panel-description {
+  margin-bottom: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.auth-notice.error {
+  color: var(--status-rejected);
+}
+
+.auth-notice.success {
+  color: var(--status-approved);
+}
+
+.auth-card form .form-group {
+  margin-bottom: 1rem;
+}
+
+.auth-card .btn-primary {
+  margin-top: 0.15rem;
+}
+
+/* --- MAIN DASHBOARD LAYOUT --- */
+.app-header {
+  background: var(--navy-dark);
+  color: white;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.beaker-icon-sm {
+  width: 24px;
+  height: 24px;
+  color: #60A5FA;
+}
+
+.header-brand-title {
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: block;
+}
+
+.header-brand-sub {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  display: block;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.role-pill {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.role-pill.student { background: #DBEAFE; color: #1E40AF; }
+.role-pill.admin { background: #FCE7F3; color: #9D174D; }
+
+.btn-logout {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.btn-logout:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+/* App Nav */
+.app-nav {
+  background: white;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 2rem;
+}
+
+.nav-group {
+  display: flex;
+  gap: 1rem;
+}
+
+.nav-btn {
+  padding: 1rem 0.5rem;
+  border: none;
+  background: none;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+
+.nav-btn.active {
+  color: var(--blue-primary);
+  border-bottom-color: var(--blue-primary);
+}
+
+/* Dashboard Sections */
+.app-content {
+  padding: 2rem;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.search-input {
+  width: 220px;
+}
+
+/* Equipment Cards Grid */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  background: white;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-category {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--blue-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.card-location {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.stock-indicator {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.stock-indicator.in-stock { color: var(--status-approved); }
+.stock-indicator.low-stock { color: var(--status-pending); }
+
+/* Table Styles */
+.table-container {
+  background: white;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  overflow-x: auto;
+  box-shadow: var(--shadow-sm);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.data-table th {
+  background: #F8FAFC;
+  padding: 0.9rem 1.25rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.data-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.status-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.status-badge.pending { background: #FEF3C7; color: #B45309; }
+.status-badge.approved { background: #DCFCE7; color: #15803D; }
+.status-badge.rejected { background: #FEE2E2; color: #B91C1C; }
+
+/* Modals */
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-dialog {
+  background: white;
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 500px;
+  padding: 2rem;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.hidden { display: none !important; }
+
+/* Action Buttons */
+.inventory-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-danger {
+  background: var(--status-rejected);
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8rem; border-radius: 6px; }
+.btn-success { background: var(--status-approved); color: white; border: none; cursor: pointer; }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .auth-wrapper { flex-direction: column; }
+  .brand-panel { flex: initial; min-height: 330px; padding: 2rem; }
+  .brand-title { font-size: 1.8rem; }
+  .brand-subtitle { margin-bottom: 1.25rem; }
+  .brand-footer { margin-top: 1.5rem; }
+  .form-panel { padding: 1.5rem; }
+  .auth-card { max-width: 480px; }
+  .app-header { flex-direction: column; gap: 1rem; align-items: flex-start; }
+  .header-right { width: 100%; justify-content: space-between; }
+}
