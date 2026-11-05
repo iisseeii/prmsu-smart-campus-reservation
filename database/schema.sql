@@ -96,18 +96,14 @@ CREATE TRIGGER on_auth_user_email_updated
     EXECUTE FUNCTION public.sync_auth_user_email();
 
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.equipment ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reservations ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.users TO authenticated;
 DROP POLICY IF EXISTS "Users can read their own profile" ON public.users;
 CREATE POLICY "Users can read their own profile"
     ON public.users FOR SELECT
     TO authenticated
     USING (auth_user_id = (SELECT auth.uid()));
-
--- Remove only the two legacy demo profiles; Supabase Auth now owns accounts.
-DELETE FROM public.users
-WHERE auth_user_id IS NULL
-  AND ((email = 'samantha@prmsu.edu.ph' AND id_number = '2023-10492')
-    OR (email = 'rosete@prmsu.edu.ph' AND id_number = 'FAC-2015-08'));
 
 -- =========================================================================
 -- SEED DATA (PRMSU Computer Engineering Hardware Assets)
