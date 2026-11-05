@@ -51,9 +51,8 @@
             <label for="authPassword" class="form-label">Password</label>
             <input type="password" id="authPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password" required>
           </div>
-
           <button type="submit" id="btnSignIn" class="btn-primary full-width">Sign In to Portal <span aria-hidden="true">&rarr;</span></button>
-          <button type="button" class="auth-link" onclick="showPasswordReset()">Forgot password?</button>
+          <button type="submit" id="btnSignIn" class="btn-primary full-width">Sign In to Portal <span aria-hidden="true">&rarr;</span></button>
         </form>
 
         <form id="signupPanel" class="hidden" role="tabpanel" aria-labelledby="tabSignup" onsubmit="handleStudentSignUp(event)">
@@ -74,26 +73,6 @@
             <input type="password" id="signupPassword" class="form-input" placeholder="At least 8 characters" minlength="8" autocomplete="new-password" required>
           </div>
           <button type="submit" id="btnSignUp" class="btn-primary full-width">Create Student Account</button>
-        </form>
-
-        <form id="passwordResetRequestPanel" class="hidden" onsubmit="handlePasswordResetRequest(event)">
-          <h2 class="auth-panel-title">Reset your password</h2>
-          <p class="auth-panel-description">Enter the email address registered to your account. A secure password reset link will be sent to your inbox.</p>
-          <div class="form-group">
-            <label for="resetEmail" class="form-label">Email</label>
-            <input type="email" id="resetEmail" class="form-input" placeholder="name@example.com" autocomplete="email" required>
-          </div>
-          <button type="submit" id="btnRequestReset" class="btn-primary full-width">Email Reset Link</button>
-          <button type="button" class="auth-link" onclick="returnToSignIn()">Back to Sign In</button>
-        </form>
-
-        <form id="passwordUpdatePanel" class="hidden" onsubmit="handlePasswordUpdate(event)">
-          <h2 class="auth-panel-title">Choose a new password</h2>
-          <div class="form-group">
-            <label for="newPassword" class="form-label">New Password</label>
-            <input type="password" id="newPassword" class="form-input" placeholder="At least 8 characters" minlength="8" autocomplete="new-password" required>
-          </div>
-          <button type="submit" id="btnUpdatePassword" class="btn-primary full-width">Save New Password</button>
         </form>
 
         <p id="authNotice" class="auth-notice" aria-live="polite">Faculty and staff accounts are provided by the administrator. Use the ID and password issued to you.</p>
