@@ -52,6 +52,7 @@
             <input type="password" id="authPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password" required>
           </div>
           <button type="submit" id="btnSignIn" class="btn-primary full-width">Sign In to Portal <span aria-hidden="true">&rarr;</span></button>
+          <button type="submit" id="btnSignIn" class="btn-primary full-width">Sign In to Portal <span aria-hidden="true">&rarr;</span></button>
         </form>
 
         <form id="signupPanel" class="hidden" role="tabpanel" aria-labelledby="tabSignup" onsubmit="handleStudentSignUp(event)">
@@ -114,6 +115,7 @@
         <button id="navApprovals" class="nav-btn active" onclick="switchDashboardTab('approvals')">Pending Approvals</button>
         <button id="navInventory" class="nav-btn" onclick="switchDashboardTab('inventory')">Inventory Manager</button>
         <button id="navAllLogs" class="nav-btn" onclick="switchDashboardTab('all-logs')">Master Log</button>
+        <button id="navUsers" class="nav-btn hidden" onclick="switchDashboardTab('users')">User Accounts</button>
       </div>
     </nav>
 
@@ -183,6 +185,7 @@
             <p>Review student requests, specify remarks, and approve or reject.</p>
           </div>
         </div>
+        <p id="approvalNotice" class="reservation-status-notice hidden" role="status" aria-live="polite"></p>
         <div class="table-container">
           <table class="data-table">
             <thead>
@@ -258,6 +261,46 @@
             </tbody>
           </table>
         </div>
+      </section>
+
+      <!-- ADMIN USER ACCOUNTS VIEW -->
+      <section id="secUsers" class="dashboard-section hidden">
+        <div class="section-header">
+          <div>
+            <h2>Create Student or Faculty Account</h2>
+            <p>Create a sign-in account and assign its initial password.</p>
+          </div>
+        </div>
+        <p class="reservation-status-notice">No email is sent. Give the user their ID/email and initial password directly.</p>
+        <form id="userAccountForm" class="user-account-form" onsubmit="handleUserAccountSubmit(event)">
+          <div class="form-group">
+            <label for="newUserName" class="form-label">Full Name</label>
+            <input type="text" id="newUserName" class="form-input" maxlength="100" autocomplete="name" required>
+          </div>
+          <div class="form-group">
+            <label for="newUserId" class="form-label">Student or Faculty ID</label>
+            <input type="text" id="newUserId" class="form-input" maxlength="50" autocomplete="username" required>
+          </div>
+          <div class="form-group">
+            <label for="newUserEmail" class="form-label">Email</label>
+            <input type="email" id="newUserEmail" class="form-input" maxlength="100" autocomplete="email" required>
+          </div>
+          <div class="form-group">
+            <label for="newUserRole" class="form-label">Account Role</label>
+            <select id="newUserRole" class="form-select" required>
+              <option value="STUDENT">Student</option>
+              <option value="INSTRUCTOR">Faculty</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="newUserPassword" class="form-label">Initial Password</label>
+            <input type="password" id="newUserPassword" class="form-input" minlength="8" maxlength="128" autocomplete="new-password" required>
+          </div>
+          <p id="userAccountNotice" class="reservation-status-notice hidden" role="status" aria-live="polite"></p>
+          <div class="user-account-actions">
+            <button type="submit" id="btnCreateUser" class="btn-primary">Create Account</button>
+          </div>
+        </form>
       </section>
 
     </main>
@@ -371,6 +414,7 @@
           <label class="form-label">Faculty / Staff Remarks</label>
           <textarea id="modalRemarksText" class="form-input" rows="3" placeholder="e.g. Approved. Please bring your PRMSU ID to the Embedded Systems Lab." required></textarea>
         </div>
+        <p id="remarksError" class="modal-form-error hidden" role="alert"></p>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" onclick="closeModal('remarksModal')">Cancel</button>
           <button type="submit" id="btnSubmitRemarks" class="btn-primary">Confirm</button>
