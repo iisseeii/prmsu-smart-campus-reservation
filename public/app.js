@@ -239,7 +239,7 @@ async function handlePasswordResetRequest(e) {
       redirectTo: `${window.location.origin}/?flow=reset`
     });
     if (error) throw error;
-    setAuthNotice('If an account exists for this email, a password reset link has been sent. If you do not receive one, check the email address or the email does not exist.', 'success');
+    setAuthNotice('If an account exists for this email, a password reset link has been sent. If you do not receive one, the email does not exists.', 'success');
   } catch (err) {
     setAuthNotice(err.message || 'Unable to send the reset email. Please try again.', 'error');
   } finally {
