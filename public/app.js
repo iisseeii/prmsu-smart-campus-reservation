@@ -579,16 +579,61 @@ async function handleRemarksSubmit(e) {
   renderApprovals();
 }
 
-async function cancelReservation(resId) {
-  if (!confirm('Are you sure you want to cancel this pending reservation?')) return;
+function cancelReservation(resId) {
+  const reservation = reservationsList.find(item => item.id === resId);
+  if (!reservation || reservation.status !== 'Pending') return;
 
-  reservationsList = reservationsList.filter(r => r.id !== resId);
+  document.getElementById('cancelReservationId').textContent = reservation.id;
+  document.getElementById('cancelEquipmentName').textContent = reservation.equipmentName;
+  document.getElementById('cancelReservationIcon').textContent = '!';
+  document.getElementById('cancelReservationIcon').classList.add('reservation-cancel-icon');
+  document.getElementById('cancelReservationTitle').textContent = 'Cancel this reservation?';
+  document.getElementById('cancelReservationMessage').textContent = 'Are you sure you want to cancel this pending request?';
+  document.getElementById('cancelReservationError').classList.add('hidden');
+  document.getElementById('btnKeepReservation').classList.remove('hidden');
+  document.getElementById('btnConfirmCancellation').classList.remove('hidden');
+  document.getElementById('btnViewReservationsAfterCancel').classList.add('hidden');
+  document.getElementById('cancelReservationModal').classList.remove('hidden');
+  document.getElementById('btnConfirmCancellation').focus();
+}
 
+async function confirmReservationCancellation() {
+  const resId = document.getElementById('cancelReservationId').textContent;
+  const button = document.getElementById('btnConfirmCancellation');
+  const errorNotice = document.getElementById('cancelReservationError');
+  if (!resId) return;
+
+  button.disabled = true;
+  errorNotice.classList.add('hidden');
   try {
-    await fetch(`/api/reservations/${resId}`, { method: 'DELETE' });
-  } catch (err) { console.warn(err); }
+    const response = await fetch(`/api/reservations/${encodeURIComponent(resId)}`, { method: 'DELETE' });
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      throw new Error('The server returned an unreadable response. Please try again.');
+    }
 
-  renderMyReservations();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to cancel this reservation. Please try again.');
+    }
+
+    reservationsList = reservationsList.filter(reservation => reservation.id !== resId);
+    renderMyReservations();
+    document.getElementById('cancelReservationIcon').textContent = '✓';
+    document.getElementById('cancelReservationIcon').classList.remove('reservation-cancel-icon');
+    document.getElementById('cancelReservationTitle').textContent = 'Reservation cancelled';
+    document.getElementById('cancelReservationMessage').textContent = 'Your pending reservation has been cancelled.';
+    document.getElementById('btnKeepReservation').classList.add('hidden');
+    button.classList.add('hidden');
+    document.getElementById('btnViewReservationsAfterCancel').classList.remove('hidden');
+    document.getElementById('btnViewReservationsAfterCancel').focus();
+  } catch (err) {
+    errorNotice.textContent = err.message || 'Unable to cancel this reservation. Please try again.';
+    errorNotice.classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function openAddInventoryModal() {
