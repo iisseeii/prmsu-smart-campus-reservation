@@ -17,11 +17,8 @@ async function fetchInitialData() {
   try {
     const eqRes = await fetch('/api/equipment');
     if (eqRes.ok) equipmentList = await eqRes.json();
-
-    const resRes = await fetch('/api/reservations');
-    if (resRes.ok) reservationsList = await resRes.json();
   } catch (err) {
-    console.warn('Backend server not connected. Running in client-side preview mode.');
+    console.error('Unable to load equipment from the server:', err);
   }
 }
 
@@ -87,6 +84,16 @@ function setAuthNotice(message, type) {
   notice.className = `auth-notice${type ? ` ${type}` : ''}`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[character]);
+}
+
 async function postAuthRequest(path, payload, accessToken) {
   let response;
   try {
@@ -118,6 +125,22 @@ async function postAuthRequest(path, payload, accessToken) {
   }
 
   return data;
+}
+
+async function apiFetch(path, options = {}) {
+  if (!supabaseClient) {
+    throw new Error('Supabase is not ready. Please reload the page and sign in again.');
+  }
+
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) throw error;
+
+  const headers = new Headers(options.headers || {});
+  if (data.session) {
+    headers.set('Authorization', `Bearer ${data.session.access_token}`);
+  }
+
+  return fetch(path, { ...options, headers });
 }
 
 async function handleSignIn(e) {
@@ -203,6 +226,8 @@ function setupUserSession() {
 
   const studentNav = document.getElementById('studentNav');
   const adminNav = document.getElementById('adminNav');
+  const usersNav = document.getElementById('navUsers');
+  usersNav.classList.toggle('hidden', currentUser.role !== 'ADMIN');
 
   if (currentUser.role === 'STUDENT') {
     studentNav.classList.remove('hidden');
@@ -231,8 +256,10 @@ async function logout() {
 
 // --- TAB SWITCHING LOGIC ---
 function switchDashboardTab(tabName) {
+  if (tabName === 'users' && currentUser?.role !== 'ADMIN') return;
+
   // Hide all sections
-  const sections = ['secCatalog', 'secMyReservations', 'secApprovals', 'secInventory', 'secAllLogs'];
+  const sections = ['secCatalog', 'secMyReservations', 'secApprovals', 'secInventory', 'secAllLogs', 'secUsers'];
   sections.forEach(s => document.getElementById(s).classList.add('hidden'));
 
   // Remove active styling from nav buttons
@@ -252,6 +279,7 @@ function switchDashboardTab(tabName) {
     document.getElementById('secApprovals').classList.remove('hidden');
     document.getElementById('navApprovals').classList.add('active');
     renderApprovals();
+    refreshApprovals();
   } else if (tabName === 'inventory') {
     document.getElementById('secInventory').classList.remove('hidden');
     document.getElementById('navInventory').classList.add('active');
@@ -260,6 +288,46 @@ function switchDashboardTab(tabName) {
     document.getElementById('secAllLogs').classList.remove('hidden');
     document.getElementById('navAllLogs').classList.add('active');
     renderMasterLog();
+  } else if (tabName === 'users') {
+    document.getElementById('secUsers').classList.remove('hidden');
+    document.getElementById('navUsers').classList.add('active');
+  }
+}
+
+async function handleUserAccountSubmit(event) {
+  event.preventDefault();
+  const form = document.getElementById('userAccountForm');
+  const button = document.getElementById('btnCreateUser');
+  const notice = document.getElementById('userAccountNotice');
+  const payload = {
+    name: document.getElementById('newUserName').value.trim(),
+    idNumber: document.getElementById('newUserId').value.trim(),
+    email: document.getElementById('newUserEmail').value.trim().toLowerCase(),
+    role: document.getElementById('newUserRole').value,
+    password: document.getElementById('newUserPassword').value
+  };
+
+  button.disabled = true;
+  notice.className = 'reservation-status-notice hidden';
+  try {
+    const response = await apiFetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to create the account.');
+    }
+
+    form.reset();
+    notice.className = 'reservation-status-notice has-decisions';
+    notice.textContent = `${data.user.role === 'INSTRUCTOR' ? 'Faculty' : 'Student'} account created for ${data.user.name} (${data.user.idNumber}). Share the initial password with them directly.`;
+  } catch (error) {
+    notice.className = 'reservation-status-notice has-error';
+    notice.textContent = error.message || 'Unable to create the account. Please try again.';
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -328,13 +396,13 @@ function renderMyReservations() {
 
   tbody.innerHTML = myRes.map(r => `
     <tr>
-      <td><strong>${r.id}</strong></td>
-      <td>${r.equipmentName}</td>
+      <td><strong>${escapeHtml(r.id)}</strong></td>
+      <td>${escapeHtml(r.equipmentName)}</td>
       <td>${r.qty}</td>
-      <td>${r.reservationDate}</td>
-      <td>${r.timeSlot}</td>
-      <td><span class="status-badge ${r.status.toLowerCase()}">${r.status === 'Approved' ? 'Accepted' : r.status}</span></td>
-      <td>${r.remarks || '-'}</td>
+      <td>${escapeHtml(r.reservationDate)}</td>
+      <td>${escapeHtml(r.timeSlot)}</td>
+      <td><span class="status-badge ${escapeHtml(r.status.toLowerCase())}">${escapeHtml(r.status === 'Approved' ? 'Accepted' : r.status)}</span></td>
+      <td>${escapeHtml(r.remarks || '-')}</td>
       <td>
         ${r.status === 'Pending' ? `<button class="btn-danger btn-sm" onclick="cancelReservation('${r.id}')">Cancel</button>` : '-'}
       </td>
@@ -347,7 +415,7 @@ async function refreshMyReservations() {
   const notice = document.getElementById('reservationStatusNotice');
   button.disabled = true;
   try {
-    const response = await fetch(`/api/reservations?userId=${encodeURIComponent(currentUser.id)}`);
+    const response = await apiFetch('/api/reservations');
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.message || 'Unable to refresh reservation status.');
@@ -368,6 +436,30 @@ async function refreshMyReservations() {
   }
 }
 
+async function refreshApprovals() {
+  const notice = document.getElementById('approvalNotice');
+  try {
+    const response = await apiFetch('/api/reservations');
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to load reservation requests.');
+    }
+    if (!Array.isArray(data)) {
+      throw new Error('The server returned an invalid reservation list.');
+    }
+
+    reservationsList = reservationsList
+      .filter(reservation => reservation.userId === currentUser.id)
+      .concat(data);
+    notice.classList.add('hidden');
+    renderApprovals();
+    renderMasterLog();
+  } catch (err) {
+    notice.textContent = err.message || 'Unable to load reservation requests.';
+    notice.className = 'reservation-status-notice has-error';
+  }
+}
+
 // --- STAFF APPROVALS RENDER ---
 function renderApprovals() {
   const tbody = document.getElementById('tblApprovals');
@@ -380,12 +472,12 @@ function renderApprovals() {
 
   tbody.innerHTML = pending.map(r => `
     <tr>
-      <td><strong>${r.id}</strong></td>
-      <td>${r.userName}</td>
-      <td>${r.equipmentName}</td>
+      <td><strong>${escapeHtml(r.id)}</strong></td>
+      <td>${escapeHtml(r.userName)}</td>
+      <td>${escapeHtml(r.equipmentName)}</td>
       <td>${r.qty}</td>
-      <td>${r.reservationDate}<br><small>${r.timeSlot}</small></td>
-      <td>${r.purpose}</td>
+      <td>${escapeHtml(r.reservationDate)}<br><small>${escapeHtml(r.timeSlot)}</small></td>
+      <td>${escapeHtml(r.purpose)}</td>
       <td>
         <button class="btn-success btn-sm" onclick="openRemarksModal('${r.id}', 'Approved')">Approve</button>
         <button class="btn-danger btn-sm" onclick="openRemarksModal('${r.id}', 'Rejected')">Reject</button>
@@ -420,13 +512,13 @@ function renderMasterLog() {
   const tbody = document.getElementById('tblMasterLog');
   tbody.innerHTML = reservationsList.map(r => `
     <tr>
-      <td><strong>${r.id}</strong></td>
-      <td>${r.userName}</td>
-      <td>${r.equipmentName}</td>
+      <td><strong>${escapeHtml(r.id)}</strong></td>
+      <td>${escapeHtml(r.userName)}</td>
+      <td>${escapeHtml(r.equipmentName)}</td>
       <td>${r.qty}</td>
-      <td>${r.reservationDate}</td>
-      <td><span class="status-badge ${r.status.toLowerCase()}">${r.status}</span></td>
-      <td>${r.remarks || '-'}</td>
+      <td>${escapeHtml(r.reservationDate)}</td>
+      <td><span class="status-badge ${escapeHtml(r.status.toLowerCase())}">${escapeHtml(r.status)}</span></td>
+      <td>${escapeHtml(r.remarks || '-')}</td>
     </tr>
   `).join('');
 }
@@ -455,7 +547,7 @@ async function handleBookingSubmit(e) {
   button.disabled = true;
   errorNotice.classList.add('hidden');
   try {
-    const response = await fetch('/api/reservations', {
+    const response = await apiFetch('/api/reservations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -510,6 +602,7 @@ function openRemarksModal(resId, action) {
   document.getElementById('remarksActionType').value = action;
   document.getElementById('remarksModalTitle').innerText = `${action} Reservation`;
   document.getElementById('btnSubmitRemarks').className = action === 'Approved' ? 'btn-primary' : 'btn-danger';
+  document.getElementById('remarksError').classList.add('hidden');
   document.getElementById('remarksModal').classList.remove('hidden');
 }
 
@@ -517,29 +610,45 @@ async function handleRemarksSubmit(e) {
   e.preventDefault();
   const resId = document.getElementById('remarksResId').value;
   const action = document.getElementById('remarksActionType').value;
-  const remarks = document.getElementById('modalRemarksText').value;
-
-  const resItem = reservationsList.find(r => r.id === resId);
-  if (resItem) {
-    resItem.status = action;
-    resItem.remarks = remarks;
-
-    if (action === 'Approved') {
-      const eq = equipmentList.find(e => e.id === resItem.equipmentId);
-      if (eq) eq.availableQty -= resItem.qty;
-    }
-  }
-
+  const remarks = document.getElementById('modalRemarksText').value.trim();
+  const button = document.getElementById('btnSubmitRemarks');
+  const errorNotice = document.getElementById('remarksError');
+  button.disabled = true;
+  errorNotice.classList.add('hidden');
   try {
-    await fetch(`/api/reservations/${resId}`, {
+    const response = await apiFetch(`/api/reservations/${encodeURIComponent(resId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: action, remarks })
     });
-  } catch (err) { console.warn(err); }
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to save the reservation decision.');
+    }
 
-  closeModal('remarksModal');
-  renderApprovals();
+    reservationsList = reservationsList.map(reservation =>
+      reservation.id === resId ? data.reservation : reservation
+    );
+    if (action === 'Approved') {
+      try {
+        const equipmentResponse = await fetch('/api/equipment');
+        if (equipmentResponse.ok) equipmentList = await equipmentResponse.json();
+      } catch (err) {
+        console.error('Unable to refresh equipment availability:', err);
+      }
+    }
+
+    closeModal('remarksModal');
+    renderApprovals();
+    const notice = document.getElementById('approvalNotice');
+    notice.className = 'reservation-status-notice has-decisions';
+    notice.textContent = `Reservation ${action === 'Approved' ? 'accepted' : 'rejected'}. The student can see the decision and your remarks in My Reservations.`;
+  } catch (err) {
+    errorNotice.textContent = err.message || 'Unable to save the reservation decision. Please try again.';
+    errorNotice.classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function cancelReservation(resId) {
@@ -569,7 +678,7 @@ async function confirmReservationCancellation() {
   button.disabled = true;
   errorNotice.classList.add('hidden');
   try {
-    const response = await fetch(`/api/reservations/${encodeURIComponent(resId)}`, { method: 'DELETE' });
+    const response = await apiFetch(`/api/reservations/${encodeURIComponent(resId)}`, { method: 'DELETE' });
     let data;
     try {
       data = await response.json();
@@ -632,7 +741,7 @@ async function handleInventorySubmit(e) {
   const button = document.getElementById('btnSaveInventory');
   button.disabled = true;
   try {
-    const response = await fetch(id ? `/api/equipment/${encodeURIComponent(id)}` : '/api/equipment', {
+    const response = await apiFetch(id ? `/api/equipment/${encodeURIComponent(id)}` : '/api/equipment', {
       method: id ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, category, totalQty, labLocation })
@@ -658,14 +767,17 @@ async function handleInventorySubmit(e) {
 
 async function deleteEquipment(eqId) {
   if (!confirm('Are you sure you want to delete this equipment item from inventory?')) return;
-
-  equipmentList = equipmentList.filter(e => e.id !== eqId);
-
   try {
-    await fetch(`/api/equipment/${eqId}`, { method: 'DELETE' });
-  } catch (err) { console.warn(err); }
+    const response = await apiFetch(`/api/equipment/${encodeURIComponent(eqId)}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to remove equipment.');
 
-  renderInventory();
+    equipmentList = equipmentList.filter(e => e.id !== eqId);
+    renderInventory();
+    renderCatalog();
+  } catch (err) {
+    alert(err.message || 'Unable to remove equipment. Please try again.');
+  }
 }
 
 function closeModal(modalId) {
